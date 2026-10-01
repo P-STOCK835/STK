@@ -189,117 +189,133 @@
     <script>
         let html5QrcodeScanner = null;
 
-        // Visualizador dinámico del archivo subido (PDF o Imagen)
-        function previsualizarArchivo(event) {
-            const file = event.target.files[0];
-            const iframe = document.getElementById('pdfVisor');
-            const img = document.getElementById('imgVisor');
-            const texto = document.getElementById('textoVisorVacío');
+// Visualizador dinámico del archivo subido (PDF o Imagen)
+function previsualizarArchivo(event) {
+    const file = event.target ? event.target.files[0] : null;
+    const iframe = document.getElementById('pdfVisor');
+    const img = document.getElementById('imgVisor');
+    const texto = document.getElementById('textoVisorVacío');
 
-            if (!file) return;
+    if (!file) {
+        // Limpiar visor si no hay archivo seleccionado
+        iframe.src = "";
+        iframe.classList.add('hidden');
+        img.src = "";
+        img.classList.add('hidden');
+        texto.classList.remove('hidden');
+        return;
+    }
 
-            const fileUrl = URL.createObjectURL(file);
-            texto.classList.add('hidden');
+    const fileUrl = URL.createObjectURL(file);
+    texto.classList.add('hidden');
 
-            if (file.type === "application/pdf") {
-                img.classList.add('hidden');
-                iframe.src = fileUrl;
-                iframe.classList.remove('hidden');
-            } else if (file.type.startsWith("image/")) {
-                iframe.classList.add('hidden');
-                img.src = fileUrl;
-                img.classList.remove('hidden');
-            }
+    if (file.type === "application/pdf") {
+        img.classList.add('hidden');
+        img.src = "";
+        iframe.src = fileUrl;
+        iframe.classList.remove('hidden');
+    } else if (file.type.startsWith("image/")) {
+        iframe.classList.add('hidden');
+        iframe.src = "";
+        img.src = fileUrl;
+        img.classList.remove('hidden');
+    }
+}
+
+function actualizarCodigoVistaPrevia() {
+    const cat = document.getElementById('categoria').value;
+    const proc = document.getElementById('proceso').value;
+    document.getElementById('codigoGeneradoVista').innerText = `${cat}S${proc}-P-***`;
+}
+
+// Obtener consecutivo siguiente para la categoría/proceso desde Firestore
+async function obtenerSiguienteConsecutivo(proceso) {
+    try {
+        const q = window.query(
+            window.collection(window.db, "piezas"),
+            window.where("procesoLetra", "==", proceso),
+            window.orderBy("consecutivoNumero", "desc"),
+            window.limit(1)
+        );
+        const querySnapshot = await window.getDocs(q);
+        if (!querySnapshot.empty) {
+            const ultimoDoc = querySnapshot.docs[0].data();
+            return (ultimoDoc.consecutivoNumero || 0) + 1;
+        }
+    } catch (e) {
+        console.log("Primer registro para el proceso o creando índice...", e);
+    }
+    return 1;
+}
+
+// Guardar Pieza en Firebase (Soporta guardar SIN archivo adjunto)
+async function guardarPieza(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true;
+    btn.innerText = "Guardando...";
+
+    try {
+        const cat = document.getElementById('categoria').value;
+        const proc = document.getElementById('proceso').value;
+        
+        // Generar número consecutivo automático
+        const numConsecutivo = await obtenerSiguienteConsecutivo(proc);
+        const numFormateado = "P-" + String(numConsecutivo).padStart(3, '0'); // ej. P-001
+        const codigoPieza = `${cat}S${proc}-${numFormateado}`; // ej. VSD-P-001
+
+        // Subir archivo a Firebase Storage SOLAMENTE si se seleccionó uno
+        let archivoUrl = "";
+        const inputArchivo = document.getElementById('archivoPlano');
+        
+        if (inputArchivo && inputArchivo.files && inputArchivo.files.length > 0) {
+            const file = inputArchivo.files[0];
+            const storageRef = window.ref(window.storage, `planos/${Date.now()}_${file.name}`);
+            await window.uploadBytes(storageRef, file);
+            archivoUrl = await window.getDownloadURL(storageRef);
         }
 
-        function actualizarCodigoVistaPrevia() {
-            const cat = document.getElementById('categoria').value;
-            const proc = document.getElementById('proceso').value;
-            document.getElementById('codigoGeneradoVista').innerText = `${cat}S${proc}-P-***`;
-        }
+        const stockActual = parseInt(document.getElementById('stockActual').value) || 0;
+        const stockMin = parseInt(document.getElementById('stockMin').value) || 0;
+        const stockMax = parseInt(document.getElementById('stockMax').value) || 1;
+        const puntoReorden = stockActual <= stockMin ? "SI" : "NO";
 
-        // Obtener consecutivo siguiente para la categoría/proceso desde Firestore
-        async function obtenerSiguienteConsecutivo(proceso) {
-            try {
-                const q = window.query(
-                    window.collection(window.db, "piezas"),
-                    window.where("procesoLetra", "==", proceso),
-                    window.orderBy("consecutivoNumero", "desc"),
-                    window.limit(1)
-                );
-                const querySnapshot = await window.getDocs(q);
-                if (!querySnapshot.empty) {
-                    const ultimoDoc = querySnapshot.docs[0].data();
-                    return (ultimoDoc.consecutivoNumero || 0) + 1;
-                }
-            } catch (e) {
-                console.log("Primer registro para el proceso o creando índice...", e);
-            }
-            return 1;
-        }
+        // Guardar en Firestore
+        await window.addDoc(window.collection(window.db, "piezas"), {
+            numero: numFormateado,
+            codigoPieza: codigoPieza,
+            categoria: cat,
+            procesoLetra: proc,
+            consecutivoNumero: numConsecutivo,
+            nombre: (document.getElementById('nombre').value || '').toUpperCase(),
+            material: (document.getElementById('material').value || '').toUpperCase(),
+            calibre: document.getElementById('calibre').value || '',
+            aplicacion: document.getElementById('aplicacion').value || '',
+            stockActual: stockActual,
+            stockMin: stockMin,
+            stockMax: stockMax,
+            puntoReorden: puntoReorden,
+            archivoUrl: archivoUrl, // Guardará texto vacío "" si no hay plano adjunto
+            fechaRegistro: new Date()
+        });
 
-        // Guardar Pieza en Firebase
-        async function guardarPieza(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btnGuardar');
-            btn.disabled = true;
-            btn.innerText = "Guardando...";
+        alert(`Pieza registrada con éxito: ${codigoPieza}`);
+        
+        // Limpiar formulario y resetear visor
+        document.getElementById('formPieza').reset();
+        document.getElementById('archivoPlano').value = "";
+        previsualizarArchivo({ target: null });
+        actualizarCodigoVistaPrevia();
+        cargarTablaPiezas();
 
-            try {
-                const cat = document.getElementById('categoria').value;
-                const proc = document.getElementById('proceso').value;
-                
-                // Generar número consecutivo automático
-                const numConsecutivo = await obtenerSiguienteConsecutivo(proc);
-                const numFormateado = "P-" + String(numConsecutivo).padStart(3, '0'); // ej. P-001
-                const codigoPieza = `${cat}S${proc}-${numFormateado}`; // ej. VSD-P-001
-
-                // Subir archivo a Firebase Storage si existe
-                let archivoUrl = "";
-                const inputArchivo = document.getElementById('archivoPlano');
-                if (inputArchivo.files.length > 0) {
-                    const file = inputArchivo.files[0];
-                    const storageRef = window.ref(window.storage, `planos/${Date.now()}_${file.name}`);
-                    await window.uploadBytes(storageRef, file);
-                    archivoUrl = await window.getDownloadURL(storageRef);
-                }
-
-                const stockActual = parseInt(document.getElementById('stockActual').value);
-                const stockMin = parseInt(document.getElementById('stockMin').value);
-                const puntoReorden = stockActual <= stockMin ? "SI" : "NO";
-
-                // Guardar en Firestore
-                await window.addDoc(window.collection(window.db, "piezas"), {
-                    numero: numFormateado,
-                    codigoPieza: codigoPieza,
-                    categoria: cat,
-                    procesoLetra: proc,
-                    consecutivoNumero: numConsecutivo,
-                    nombre: document.getElementById('nombre').value.toUpperCase(),
-                    material: document.getElementById('material').value.toUpperCase(),
-                    calibre: document.getElementById('calibre').value,
-                    aplicacion: document.getElementById('aplicacion').value,
-                    stockActual: stockActual,
-                    stockMin: stockMin,
-                    stockMax: parseInt(document.getElementById('stockMax').value),
-                    puntoReorden: puntoReorden,
-                    archivoUrl: archivoUrl,
-                    fechaRegistro: new Date()
-                });
-
-                alert(`Pieza registrada con exito: ${codigoPieza}`);
-                document.getElementById('formPieza').reset();
-                actualizarCodigoVistaPrevia();
-                cargarTablaPiezas();
-
-            } catch (error) {
-                console.error("Error al guardar: ", error);
-                alert("Error al guardar la pieza. Asegurate de configurar Firebase.");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Guardar Pieza en Stock";
-            }
-        }
+    } catch (error) {
+        console.error("Error al guardar: ", error);
+        alert("Error al guardar la pieza: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Guardar Pieza en Stock";
+    }
+}
 
         // Cargar registros en la tabla
         async function cargarTablaPiezas() {
