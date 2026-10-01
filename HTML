@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOLMEX - Control de Piezas en Stock</title>
+    <!-- Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librería para escanear QR / Código de Barras -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+    <!-- Encabezado VOLMEX -->
+    <header class="bg-orange-600 text-white shadow-md p-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold tracking-wider">VOLMEX</h1>
+            <p class="text-xs text-orange-200">Control de Piezas en Stock</p>
+        </div>
+        <button onclick="toggleEscaner()" class="bg-white text-orange-600 px-3 py-2 rounded-lg font-bold shadow hover:bg-orange-50 text-sm flex items-center gap-1">
+            📷 Escanear Código
+        </button>
+    </header>
+
+    <!-- Modal de Escáner -->
+    <div id="modalEscaner" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-white p-4 rounded-xl max-w-sm w-full text-center">
+            <h3 class="font-bold text-lg mb-2">Escanear Código de Pieza</h3>
+            <div id="reader" class="w-full"></div>
+            <button onclick="toggleEscaner()" class="mt-4 bg-gray-500 text-white px-4 py-2 rounded-lg w-full">Cerrar Escáner</button>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LADO IZQUIERDO: Formulario de Registro + Visor -->
+        <section class="lg:col-span-5 bg-white p-6 rounded-xl shadow-md flex flex-col gap-4">
+            <h2 class="text-lg font-bold text-gray-700 border-b pb-2">Registrar Nueva Pieza</h2>
+
+            <!-- Selector de Archivo PDF / Imagen -->
+            <div class="border-2 border-dashed border-gray-300 p-3 rounded-lg text-center bg-gray-50">
+                <label class="block text-sm font-semibold mb-1 text-gray-600">Subir Plano / Imagen (PDF o JPG/PNG):</label>
+                <input type="file" id="archivoPlano" accept="application/pdf,image/*" onchange="previsualizarArchivo(event)" class="text-xs w-full text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-orange-500 file:text-white file:font-semibold hover:file:bg-orange-600">
+            </div>
+
+            <!-- Previsualización del Plano / PDF -->
+            <div id="contenedorVisor" class="h-48 border rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
+                <span id="textoVisorVacío" class="text-xs text-gray-500">Selecciona un archivo para ver la previsualización</span>
+                <iframe id="pdfVisor" class="w-full h-full hidden"></iframe>
+                <img id="imgVisor" class="max-h-full object-contain hidden" alt="Previsualización de la pieza">
+            </div>
+
+            <!-- Formulario de Datos -->
+            <form id="formPieza" onsubmit="guardarPieza(event)" class="space-y-3 text-sm">
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold">Categoría:</label>
+                        <select id="categoria" onchange="actualizarCodigoVistaPrevia()" class="w-full border p-2 rounded focus:ring-2 focus:ring-orange-500" required>
+                            <option value="V">Volteo (V)</option>
+                            <option value="L">Lowboy (L)</option>
+                            <option value="G">Góndola (G)</option>
+                            <option value="X">Genérico (X)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold">Proceso:</label>
+                        <select id="proceso" onchange="actualizarCodigoVistaPrevia()" class="w-full border p-2 rounded focus:ring-2 focus:ring-orange-500" required>
+                            <option value="D">Corte / Doblez (D)</option>
+                            <option value="F">Corte / Flat (F)</option>
+                            <option value="M">Maquinado (M)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Código Generado (Vista Previa) -->
+                <div class="bg-orange-100 p-2 rounded text-center border border-orange-300">
+                    <span class="text-xs font-bold text-orange-800">Código Asignado: </span>
+                    <span id="codigoGeneradoVista" class="font-mono font-bold text-orange-900 text-base">VSD-P-***</span>
+                </div>
+
+                <div>
+                    <label class="block font-semibold">Nombre de la Pieza:</label>
+                    <input type="text" id="nombre" placeholder="ej. MENSULA IZQ." class="w-full border p-2 rounded" required>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold">Material:</label>
+                        <input type="text" id="material" placeholder="ej. A-36" class="w-full border p-2 rounded" required>
+                    </div>
+                    <div>
+                        <label class="block font-semibold">Calibre / Espesor:</label>
+                        <input type="text" id="calibre" placeholder="ej. 134" class="w-full border p-2 rounded" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold">Aplicación Principal:</label>
+                    <input type="text" id="aplicacion" placeholder="Opcional" class="w-full border p-2 rounded">
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block font-semibold text-xs">Stock Actual:</label>
+                        <input type="number" id="stockActual" value="0" min="0" class="w-full border p-2 rounded" required>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-xs">Stock Mínimo:</label>
+                        <input type="number" id="stockMin" value="1" min="0" class="w-full border p-2 rounded" required>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-xs">Stock Máximo:</label>
+                        <input type="number" id="stockMax" value="5" min="1" class="w-full border p-2 rounded" required>
+                    </div>
+                </div>
+
+                <button type="submit" id="btnGuardar" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-lg transition-all shadow">
+                    Guardar Pieza en Stock
+                </button>
+            </form>
+        </section>
+
+        <!-- LADO DERECHO: Tabla de Inventario -->
+        <section class="lg:col-span-7 bg-white p-6 rounded-xl shadow-md overflow-x-auto">
+            <h2 class="text-lg font-bold text-gray-700 border-b pb-2 mb-4">Inventario de Piezas Registradas</h2>
+            
+            <table class="w-full text-xs text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-gray-700 border-b">
+                        <th class="p-2">No.</th>
+                        <th class="p-2">Código</th>
+                        <th class="p-2">Nombre</th>
+                        <th class="p-2">Mat / Cal</th>
+                        <th class="p-2">Stock</th>
+                        <th class="p-2">Reorden</th>
+                        <th class="p-2">Plano</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaPiezasBody" class="divide-y">
+                    <!-- Registros dinámicos desde Firebase -->
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- MÓDULO SDK FIREBASE (v9/v10) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        // CONFIGURA AQUÍ TUS CLAVES DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Hacer funciones accesibles globalmente
+        window.db = db;
+        window.storage = storage;
+        window.addDoc = addDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy;
+        window.limit = limit;
+        window.ref = ref;
+        window.uploadBytes = uploadBytes;
+        window.getDownloadURL = getDownloadURL;
+
+        // Cargar registros al iniciar
+        cargarTablaPiezas();
+    </script>
+
+    <!-- LÓGICA DE LA APLICACIÓN -->
+    <script>
+        let html5QrcodeScanner = null;
+
+        // Visualizador dinámico del archivo subido (PDF o Imagen)
+        function previsualizarArchivo(event) {
+            const file = event.target.files[0];
+            const iframe = document.getElementById('pdfVisor');
+            const img = document.getElementById('imgVisor');
+            const texto = document.getElementById('textoVisorVacío');
+
+            if (!file) return;
+
+            const fileUrl = URL.createObjectURL(file);
+            texto.classList.add('hidden');
+
+            if (file.type === "application/pdf") {
+                img.classList.add('hidden');
+                iframe.src = fileUrl;
+                iframe.classList.remove('hidden');
+            } else if (file.type.startsWith("image/")) {
+                iframe.classList.add('hidden');
+                img.src = fileUrl;
+                img.classList.remove('hidden');
+            }
+        }
+
+        function actualizarCodigoVistaPrevia() {
+            const cat = document.getElementById('categoria').value;
+            const proc = document.getElementById('proceso').value;
+            document.getElementById('codigoGeneradoVista').innerText = `${cat}S${proc}-P-***`;
+        }
+
+        // Obtener consecutivo siguiente para la categoría/proceso desde Firestore
+        async function obtenerSiguienteConsecutivo(proceso) {
+            try {
+                const q = window.query(
+                    window.collection(window.db, "piezas"),
+                    window.where("procesoLetra", "==", proceso),
+                    window.orderBy("consecutivoNumero", "desc"),
+                    window.limit(1)
+                );
+                const querySnapshot = await window.getDocs(q);
+                if (!querySnapshot.empty) {
+                    const ultimoDoc = querySnapshot.docs[0].data();
+                    return (ultimoDoc.consecutivoNumero || 0) + 1;
+                }
+            } catch (e) {
+                console.log("Primer registro para el proceso o creando índice...", e);
+            }
+            return 1;
+        }
+
+        // Guardar Pieza en Firebase
+        async function guardarPieza(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnGuardar');
+            btn.disabled = true;
+            btn.innerText = "Guardando...";
+
+            try {
+                const cat = document.getElementById('categoria').value;
+                const proc = document.getElementById('proceso').value;
+                
+                // Generar número consecutivo automático
+                const numConsecutivo = await obtenerSiguienteConsecutivo(proc);
+                const numFormateado = "P-" + String(numConsecutivo).padStart(3, '0'); // ej. P-001
+                const codigoPieza = `${cat}S${proc}-${numFormateado}`; // ej. VSD-P-001
+
+                // Subir archivo a Firebase Storage si existe
+                let archivoUrl = "";
+                const inputArchivo = document.getElementById('archivoPlano');
+                if (inputArchivo.files.length > 0) {
+                    const file = inputArchivo.files[0];
+                    const storageRef = window.ref(window.storage, `planos/${Date.now()}_${file.name}`);
+                    await window.uploadBytes(storageRef, file);
+                    archivoUrl = await window.getDownloadURL(storageRef);
+                }
+
+                const stockActual = parseInt(document.getElementById('stockActual').value);
+                const stockMin = parseInt(document.getElementById('stockMin').value);
+                const puntoReorden = stockActual <= stockMin ? "SI" : "NO";
+
+                // Guardar en Firestore
+                await window.addDoc(window.collection(window.db, "piezas"), {
+                    numero: numFormateado,
+                    codigoPieza: codigoPieza,
+                    categoria: cat,
+                    procesoLetra: proc,
+                    consecutivoNumero: numConsecutivo,
+                    nombre: document.getElementById('nombre').value.toUpperCase(),
+                    material: document.getElementById('material').value.toUpperCase(),
+                    calibre: document.getElementById('calibre').value,
+                    aplicacion: document.getElementById('aplicacion').value,
+                    stockActual: stockActual,
+                    stockMin: stockMin,
+                    stockMax: parseInt(document.getElementById('stockMax').value),
+                    puntoReorden: puntoReorden,
+                    archivoUrl: archivoUrl,
+                    fechaRegistro: new Date()
+                });
+
+                alert(`Pieza registrada con exito: ${codigoPieza}`);
+                document.getElementById('formPieza').reset();
+                actualizarCodigoVistaPrevia();
+                cargarTablaPiezas();
+
+            } catch (error) {
+                console.error("Error al guardar: ", error);
+                alert("Error al guardar la pieza. Asegurate de configurar Firebase.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Guardar Pieza en Stock";
+            }
+        }
+
+        // Cargar registros en la tabla
+        async function cargarTablaPiezas() {
+            const tbody = document.getElementById('tablaPiezasBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">Cargando inventario...</td></tr>';
+
+            try {
+                const querySnapshot = await window.getDocs(window.collection(window.db, "piezas"));
+                tbody.innerHTML = '';
+
+                if (querySnapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay piezas registradas aun.</td></tr>';
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const reordenColor = data.puntoReorden === "SI" ? "bg-green-100 text-green-800 font-bold" : "bg-gray-100 text-gray-600";
+                    
+                    const fila = `
+                        <tr class="hover:bg-gray-50 border-b">
+                            <td class="p-2 font-semibold">${data.numero}</td>
+                            <td class="p-2 font-mono text-orange-700 font-bold">${data.codigoPieza}</td>
+                            <td class="p-2">${data.nombre}</td>
+                            <td class="p-2">${data.material} / Cal. ${data.calibre}</td>
+                            <td class="p-2 font-bold">${data.stockActual}</td>
+                            <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${reordenColor}">${data.puntoReorden}</span></td>
+                            <td class="p-2 text-center">
+                                ${data.archivoUrl ? `<a href="${data.archivoUrl}" target="_blank" class="text-blue-600 underline">Ver Plano</a>` : '-'}
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += fila;
+                });
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-red-500">Configura tus credenciales de Firebase en el codigo para conectar la base de datos.</td></tr>';
+            }
+        }
+
+        // Módulo de Escáner QR
+        function toggleEscaner() {
+            const modal = document.getElementById('modalEscaner');
+            modal.classList.toggle('hidden');
+
+            if (!modal.classList.contains('hidden')) {
+                html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 200, height: 200 } });
+                html5QrcodeScanner.render((decodedText) => {
+                    alert(`Codigo Escaneado: ${decodedText}`);
+                    html5QrcodeScanner.clear();
+                    modal.classList.add('hidden');
+                });
+            } else if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear();
+            }
+        }
+    </script>
+</body>
+</html>
