@@ -3,362 +3,1702 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VOLMEX - Control de Piezas en Stock</title>
-    <!-- Tailwind CSS -->
+    <title>VOLMEX - Control y Clasificación de Piezas</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Escáner QR / Código de Barras -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- Supabase JS SDK -->
+
+    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Escáner QR / códigos de barras -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Generación de QR y código de barras -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <!-- Generación de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800">
 
-    <!-- Encabezado VOLMEX -->
-    <header class="bg-orange-600 text-white shadow-md p-4 flex justify-between items-center">
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+<header class="bg-orange-600 text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-bold tracking-wider">VOLMEX</h1>
-            <p class="text-xs text-orange-200">Control de Piezas en Stock</p>
+            <h1 class="text-2xl font-extrabold tracking-wide">VOLMEX</h1>
+            <p class="text-xs text-orange-100">Control, clasificación y reposición de piezas en stock</p>
         </div>
-        <button onclick="toggleEscaner()" class="bg-white text-orange-600 px-3 py-2 rounded-lg font-bold shadow hover:bg-orange-50 text-sm flex items-center gap-1">
-            📷 Escanear Código
-        </button>
-    </header>
 
-    <!-- Modal de Escáner -->
-    <div id="modalEscaner" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-        <div class="bg-white p-4 rounded-xl max-w-sm w-full text-center">
-            <h3 class="font-bold text-lg mb-2">Escanear Código de Pieza</h3>
-            <div id="reader" class="w-full"></div>
-            <button onclick="toggleEscaner()" class="mt-4 bg-gray-500 text-white px-4 py-2 rounded-lg w-full">Cerrar Escáner</button>
+        <span id="estadoConexion" class="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">Conectando con Supabase...</span>
+        <div class="flex flex-wrap gap-2">
+            <button onclick="mostrarSeccion('inventario')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">
+                📦 Inventario
+            </button>
+            <button onclick="mostrarSeccion('solicitudes')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">
+                📝 Solicitudes
+            </button>
+            <button onclick="abrirEscaner()" class="bg-white text-orange-700 hover:bg-orange-50 px-3 py-2 rounded-lg text-sm font-bold shadow">
+                📷 Escanear
+            </button>
         </div>
     </div>
+</header>
 
-    <main class="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<main class="max-w-7xl mx-auto p-4 md:p-6">
 
-        <!-- LADO IZQUIERDO: Formulario de Registro + Visor -->
-        <section class="lg:col-span-5 bg-white p-6 rounded-xl shadow-md flex flex-col gap-4">
-            <h2 class="text-lg font-bold text-gray-700 border-b pb-2">Registrar Nueva Pieza</h2>
-
-            <!-- Selector de Archivo PDF / Imagen -->
-            <div class="border-2 border-dashed border-gray-300 p-3 rounded-lg text-center bg-gray-50">
-                <label class="block text-sm font-semibold mb-1 text-gray-600">Subir Plano / Imagen (PDF o JPG/PNG):</label>
-                <input type="file" id="archivoPlano" accept="application/pdf,image/*" onchange="previsualizarArchivo(event)" class="text-xs w-full text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-orange-500 file:text-white file:font-semibold hover:file:bg-orange-600">
+    <!-- INDICADORES -->
+    <section id="seccionInventario">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="text-xs text-slate-500">Piezas registradas</div>
+                <div id="statPiezas" class="text-2xl font-extrabold mt-1">0</div>
             </div>
-
-            <!-- Previsualización del Plano / PDF -->
-            <div id="contenedorVisor" class="h-48 border rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
-                <span id="textoVisorVacío" class="text-xs text-gray-500">Selecciona un archivo para ver la previsualización</span>
-                <iframe id="pdfVisor" class="w-full h-full hidden"></iframe>
-                <img id="imgVisor" class="max-h-full object-contain hidden" alt="Previsualización de la pieza">
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="text-xs text-slate-500">Unidades en stock</div>
+                <div id="statUnidades" class="text-2xl font-extrabold mt-1">0</div>
             </div>
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="text-xs text-slate-500">Piezas bajo mínimo</div>
+                <div id="statBajoMin" class="text-2xl font-extrabold mt-1 text-red-600">0</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="text-xs text-slate-500">Solicitudes pendientes</div>
+                <div id="statSolicitudes" class="text-2xl font-extrabold mt-1 text-orange-600">0</div>
+            </div>
+        </div>
 
-            <!-- Formulario de Datos -->
-            <form id="formPieza" onsubmit="guardarPieza(event)" class="space-y-3 text-sm">
-                
-                <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+
+            <!-- FORMULARIO -->
+            <section class="xl:col-span-4 bg-white rounded-xl shadow-md p-5 h-fit">
+                <div class="flex items-center justify-between border-b pb-3 mb-4">
                     <div>
-                        <label class="block font-semibold">Categoría:</label>
-                        <select id="categoria" onchange="actualizarCodigoVistaPrevia()" class="w-full border p-2 rounded focus:ring-2 focus:ring-orange-500" required>
-                            <option value="V">Volteo (V)</option>
-                            <option value="L">Lowboy (L)</option>
-                            <option value="G">Góndola (G)</option>
-                            <option value="X">Genérico (X)</option>
+                        <h2 id="tituloFormulario" class="font-bold text-lg">Registrar nueva pieza</h2>
+                        <p class="text-xs text-slate-500">Los datos se guardan en Supabase.</p>
+                    </div>
+                    <span id="estadoEdicion" class="hidden text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">EDITANDO</span>
+                </div>
+
+                <form id="formPieza" onsubmit="guardarPieza(event)" class="space-y-3 text-sm">
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1">Categoría</label>
+                            <select id="categoria" onchange="actualizarCodigoVistaPrevia()" class="w-full border rounded-lg p-2.5" required>
+                                <option value="V">Volteo (V)</option>
+                                <option value="L">Lowboy (L)</option>
+                                <option value="G">Góndola (G)</option>
+                                <option value="X">Genérico (X)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Proceso</label>
+                            <select id="proceso" onchange="actualizarCodigoVistaPrevia()" class="w-full border rounded-lg p-2.5" required>
+                                <option value="D">Corte / Doblez (D)</option>
+                                <option value="F">Corte / Flat (F)</option>
+                                <option value="M">Maquinado (M)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-orange-700">Código de pieza</div>
+                        <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VSD-P-001</div>
+                        <div id="ayudaCodigo" class="text-[11px] text-orange-700 mt-1">Se asigna automáticamente.</div>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Nombre de la pieza</label>
+                        <input type="text" id="nombre" placeholder="Ej. MENSULA IZQ." class="w-full border rounded-lg p-2.5" required>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1">Material</label>
+                            <input type="text" id="material" placeholder="Ej. A-36" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Calibre / espesor</label>
+                            <input type="text" id="calibre" placeholder="Ej. 3/16, 10 mm..." class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Aplicación principal</label>
+                        <input type="text" id="aplicacion" placeholder="Ej. Bastidor, suspensión, tanque..." class="w-full border rounded-lg p-2.5">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1 text-xs">Stock actual</label>
+                            <input type="number" id="stockActual" value="0" min="0" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1 text-xs">Stock mínimo</label>
+                            <input type="number" id="stockMin" value="1" min="0" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1 text-xs">Stock máximo</label>
+                            <input type="number" id="stockMax" value="5" min="1" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                    </div>
+
+                    <!-- ARCHIVO -->
+                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-3 bg-slate-50">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <div class="font-semibold text-sm">Plano / imagen</div>
+                                <div class="text-[11px] text-slate-500">PDF, JPG, JPEG o PNG · máximo 10 MB</div>
+                            </div>
+                            <span id="estadoArchivo" class="text-[11px] text-slate-500">Sin archivo</span>
+                        </div>
+
+                        <input type="file" id="archivoPlano" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                               onchange="previsualizarArchivo(event)"
+                               class="mt-2 block w-full text-xs">
+
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" onclick="limpiarArchivoSeleccionado()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg px-3 py-2 text-xs font-semibold">
+                                Quitar selección
+                            </button>
+                            <button type="button" onclick="quitarArchivoExistente()" id="btnQuitarArchivoExistente" class="hidden flex-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg px-3 py-2 text-xs font-semibold">
+                                Quitar archivo guardado
+                            </button>
+                        </div>
+
+                        <div id="contenedorVisor" class="mt-3 h-48 border rounded-lg bg-slate-200 flex items-center justify-center overflow-hidden">
+                            <span id="textoVisorVacio" class="text-xs text-slate-500 p-4 text-center">Aquí aparecerá la previsualización del PDF o imagen.</span>
+                            <iframe id="pdfVisor" class="w-full h-full hidden" title="Vista previa PDF"></iframe>
+                            <img id="imgVisor" class="max-h-full max-w-full object-contain hidden" alt="Vista previa de pieza">
+                        </div>
+                        <div id="progresoArchivo" class="hidden mt-2">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span>Subiendo archivo...</span><span id="textoProgreso">0%</span>
+                            </div>
+                            <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div id="barraProgreso" class="h-full bg-orange-500 transition-all" style="width:0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="editDocId" value="">
+                    <input type="hidden" id="archivoUrlActual" value="">
+                    <input type="hidden" id="archivoPathActual" value="">
+                    <input type="hidden" id="archivoNombreActual" value="">
+                    <input type="hidden" id="archivoTipoActual" value="">
+                    <input type="hidden" id="quitarArchivo" value="0">
+
+                    <div class="flex gap-2">
+                        <button type="submit" id="btnGuardar" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow">
+                            💾 Guardar pieza
+                        </button>
+                        <button type="button" id="btnCancelarEdicion" onclick="cancelarEdicion()" class="hidden bg-slate-200 hover:bg-slate-300 px-4 rounded-lg font-semibold">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- INVENTARIO -->
+            <section class="xl:col-span-8 bg-white rounded-xl shadow-md p-5">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b pb-4 mb-4">
+                    <div>
+                        <h2 class="font-bold text-lg">Inventario de piezas</h2>
+                        <p class="text-xs text-slate-500">Busca, filtra, edita, elimina, escanea o genera PDF.</p>
+                    </div>
+                    <button onclick="descargarInventarioPDF()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold">
+                        📄 Descargar inventario PDF
+                    </button>
+                </div>
+
+                <!-- FILTROS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
+                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre..."
+                           class="border rounded-lg p-2.5 text-sm">
+                    <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
+                        <option value="">Todos los materiales</option>
+                    </select>
+                    <select id="filtroCalibre" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
+                        <option value="">Todos los calibres</option>
+                    </select>
+                    <select id="filtroCategoria" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <select id="filtroEstadoStock" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
+                        <option value="">Todo el stock</option>
+                        <option value="BAJO">Bajo mínimo</option>
+                        <option value="OK">Stock normal</option>
+                        <option value="CERO">Sin stock</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-between mb-3">
+                    <div id="textoResultados" class="text-xs text-slate-500">0 resultados</div>
+                    <button onclick="limpiarFiltros()" class="text-xs text-orange-700 hover:underline font-semibold">Limpiar filtros</button>
+                </div>
+
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="w-full text-xs text-left min-w-[1050px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b">
+                                <th class="p-2.5">No.</th>
+                                <th class="p-2.5">Código</th>
+                                <th class="p-2.5">Nombre</th>
+                                <th class="p-2.5">Material</th>
+                                <th class="p-2.5">Calibre</th>
+                                <th class="p-2.5 text-center">Stock</th>
+                                <th class="p-2.5">Estado</th>
+                                <th class="p-2.5">Plano</th>
+                                <th class="p-2.5">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaPiezasBody" class="divide-y">
+                            <tr><td colspan="9" class="p-5 text-center text-slate-400">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </section>
+
+    <!-- SOLICITUDES -->
+    <section id="seccionSolicitudes" class="hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <section class="lg:col-span-5 bg-white rounded-xl shadow-md p-5 h-fit">
+                <h2 class="font-bold text-lg border-b pb-3 mb-4">Solicitar más piezas</h2>
+                <form id="formSolicitud" onsubmit="guardarSolicitud(event)" class="space-y-3 text-sm">
+                    <div>
+                        <label class="block font-semibold mb-1">Pieza</label>
+                        <select id="solicitudPieza" class="w-full border rounded-lg p-2.5" required>
+                            <option value="">Selecciona una pieza</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block font-semibold">Proceso:</label>
-                        <select id="proceso" onchange="actualizarCodigoVistaPrevia()" class="w-full border p-2 rounded focus:ring-2 focus:ring-orange-500" required>
-                            <option value="D">Corte / Doblez (D)</option>
-                            <option value="F">Corte / Flat (F)</option>
-                            <option value="M">Maquinado (M)</option>
-                        </select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1">Cantidad</label>
+                            <input type="number" id="solicitudCantidad" min="1" value="1" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Prioridad</label>
+                            <select id="solicitudPrioridad" class="w-full border rounded-lg p-2.5">
+                                <option value="Normal">Normal</option>
+                                <option value="Alta">Alta</option>
+                                <option value="Urgente">Urgente</option>
+                            </select>
+                        </div>
                     </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Solicita</label>
+                        <input type="text" id="solicitudSolicitante" placeholder="Nombre del responsable" class="w-full border rounded-lg p-2.5" required>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Motivo / comentario</label>
+                        <textarea id="solicitudMotivo" rows="4" placeholder="Ej. Se agotó la pieza y hay producción programada..." class="w-full border rounded-lg p-2.5"></textarea>
+                    </div>
+                    <button type="submit" id="btnSolicitud" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">
+                        📝 Crear solicitud
+                    </button>
+                </form>
+            </section>
+
+            <section class="lg:col-span-7 bg-white rounded-xl shadow-md p-5">
+                <div class="flex items-center justify-between border-b pb-3 mb-4">
+                    <div>
+                        <h2 class="font-bold text-lg">Solicitudes de piezas</h2>
+                        <p class="text-xs text-slate-500">Aquí puedes cambiar el estado de cada solicitud.</p>
+                    </div>
+                    <select id="filtroSolicitudEstado" onchange="renderSolicitudes()" class="border rounded-lg p-2 text-xs">
+                        <option value="">Todas</option>
+                        <option value="Pendiente">Pendientes</option>
+                        <option value="En proceso">En proceso</option>
+                        <option value="Completada">Completadas</option>
+                        <option value="Cancelada">Canceladas</option>
+                    </select>
                 </div>
 
-                <!-- Código Generado (Vista Previa) -->
-                <div class="bg-orange-100 p-2 rounded text-center border border-orange-300">
-                    <span class="text-xs font-bold text-orange-800">Código Asignado: </span>
-                    <span id="codigoGeneradoVista" class="font-mono font-bold text-orange-900 text-base">VSD-P-***</span>
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="w-full text-xs text-left min-w-[800px]">
+                        <thead>
+                            <tr class="bg-slate-100 border-b">
+                                <th class="p-2.5">Fecha</th>
+                                <th class="p-2.5">Pieza</th>
+                                <th class="p-2.5">Cantidad</th>
+                                <th class="p-2.5">Prioridad</th>
+                                <th class="p-2.5">Solicita</th>
+                                <th class="p-2.5">Estado</th>
+                                <th class="p-2.5">Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaSolicitudesBody" class="divide-y">
+                            <tr><td colspan="7" class="p-5 text-center text-slate-400">Cargando...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
+            </section>
+        </div>
+    </section>
+</main>
 
+<!-- MODAL ESCÁNER -->
+<div id="modalEscaner" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-full max-w-2xl p-5 shadow-2xl">
+            <div class="flex items-center justify-between mb-3">
                 <div>
-                    <label class="block font-semibold">Nombre de la Pieza:</label>
-                    <input type="text" id="nombre" placeholder="ej. MENSULA IZQ." class="w-full border p-2 rounded" required>
+                    <h3 class="font-bold text-lg">Escanear QR / código de barras</h3>
+                    <p class="text-xs text-slate-500">La cámara busca directamente el código de la pieza.</p>
                 </div>
+                <button onclick="cerrarEscaner()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
+            </div>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block font-semibold">Material:</label>
-                        <input type="text" id="material" placeholder="ej. A-36" class="w-full border p-2 rounded" required>
-                    </div>
-                    <div>
-                        <label class="block font-semibold">Calibre / Espesor:</label>
-                        <input type="text" id="calibre" placeholder="ej. 134" class="w-full border p-2 rounded" required>
-                    </div>
-                </div>
+            <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg p-3 mb-3">
+                <b>Importante:</b> el acceso a la cámara normalmente requiere <b>HTTPS o localhost</b>.
+                Si abriste el HTML directamente desde una carpeta (<code>file://</code>), usa Live Server u otro servidor local.
+            </div>
 
-                <div>
-                    <label class="block font-semibold">Aplicación Principal:</label>
-                    <input type="text" id="aplicacion" placeholder="Opcional" class="w-full border p-2 rounded">
-                </div>
-
-                <div class="grid grid-cols-3 gap-2">
-                    <div>
-                        <label class="block font-semibold text-xs">Stock Actual:</label>
-                        <input type="number" id="stockActual" value="0" min="0" class="w-full border p-2 rounded" required>
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-xs">Stock Mínimo:</label>
-                        <input type="number" id="stockMin" value="1" min="0" class="w-full border p-2 rounded" required>
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-xs">Stock Máximo:</label>
-                        <input type="number" id="stockMax" value="5" min="1" class="w-full border p-2 rounded" required>
-                    </div>
-                </div>
-
-                <button type="submit" id="btnGuardar" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-lg transition-all shadow">
-                    Guardar Pieza en Stock
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                <select id="camaraSelect" class="md:col-span-2 border rounded-lg p-2.5">
+                    <option value="">Detectando cámaras...</option>
+                </select>
+                <button onclick="iniciarCamara()" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg px-3 py-2 font-bold">
+                    ▶ Iniciar
                 </button>
-            </form>
-        </section>
+            </div>
 
-        <!-- LADO DERECHO: Tabla de Inventario -->
-        <section class="lg:col-span-7 bg-white p-6 rounded-xl shadow-md overflow-x-auto">
-            <h2 class="text-lg font-bold text-gray-700 border-b pb-2 mb-4">Inventario de Piezas Registradas</h2>
-            
-            <table class="w-full text-xs text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-100 text-gray-700 border-b">
-                        <th class="p-2">No.</th>
-                        <th class="p-2">Código</th>
-                        <th class="p-2">Nombre</th>
-                        <th class="p-2">Mat / Cal</th>
-                        <th class="p-2">Stock</th>
-                        <th class="p-2">Reorden</th>
-                        <th class="p-2">Plano</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaPiezasBody" class="divide-y">
-                    <!-- Registros dinámicos -->
-                </tbody>
-            </table>
-        </section>
+            <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[240px] overflow-hidden"></div>
 
-    </main>
+            <div class="mt-3 flex gap-2">
+                <button onclick="detenerCamara()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg py-2 font-semibold">⏹ Detener</button>
+                <button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-2 font-semibold">Cerrar</button>
+            </div>
 
-    <!-- LÓGICA DE SUPABASE Y APLICACIÓN -->
-    <script>
-        // PEGA AQUÍ TUS CREDENCIALES DE SUPABASE
-        const SUPABASE_URL = "TU_SUPABASE_URL_AQUI";
-        const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY_AQUI";
+            <div class="border-t mt-4 pt-4">
+                <label class="block font-semibold text-sm mb-1">También puedes escribir el código</label>
+                <div class="flex gap-2">
+                    <input id="codigoManual" class="flex-1 border rounded-lg p-2.5" placeholder="Ej. VSD-P-001">
+                    <button onclick="buscarCodigoManual()" class="bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-4 font-bold">Buscar</button>
+                </div>
+                <div id="mensajeEscaner" class="text-xs text-slate-500 mt-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<!-- MODAL DETALLE / CÓDIGO -->
+<div id="modalDetalle" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl max-w-4xl w-full p-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b pb-3">
+                <div>
+                    <h3 id="detalleTitulo" class="font-bold text-xl">Detalle de pieza</h3>
+                    <div id="detalleCodigo" class="font-mono text-orange-700 font-extrabold mt-1"></div>
+                </div>
+                <button onclick="cerrarDetalle()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
+            </div>
 
-        let html5QrcodeScanner = null;
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 py-5">
+                <div class="md:col-span-2 grid grid-cols-2 gap-3 text-sm">
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Nombre:</b><div id="dNombre"></div></div>
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Material:</b><div id="dMaterial"></div></div>
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Calibre:</b><div id="dCalibre"></div></div>
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Aplicación:</b><div id="dAplicacion"></div></div>
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Stock actual:</b><div id="dStock"></div></div>
+                    <div class="bg-slate-50 rounded-lg p-3"><b>Estado:</b><div id="dEstado"></div></div>
+                </div>
 
-        // Visualizador dinámico de archivos
-        function previsualizarArchivo(event) {
-            const file = event.target ? event.target.files[0] : null;
-            const iframe = document.getElementById('pdfVisor');
-            const img = document.getElementById('imgVisor');
-            const texto = document.getElementById('textoVisorVacío');
+                <div class="border rounded-xl p-3 text-center">
+                    <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div>
+                    <div id="qrDetalle" class="flex justify-center min-h-[170px]"></div>
+                    <svg id="barcodeDetalle" class="w-full mt-3"></svg>
+                    <div class="text-[11px] text-slate-500 mt-2">Escanéalo para localizar la pieza.</div>
+                </div>
+            </div>
 
-            if (!file) {
-                iframe.src = "";
-                iframe.classList.add('hidden');
-                img.src = "";
-                img.classList.add('hidden');
-                texto.classList.remove('hidden');
-                return;
+            <div id="detalleArchivo" class="border-t pt-4 mb-4"></div>
+
+            <div class="flex flex-wrap gap-2">
+                <button id="btnDetalleEditar" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">✏️ Editar</button>
+                <button id="btnDetalleSolicitud" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg px-4 py-2 font-semibold">📝 Solicitar piezas</button>
+                <button id="btnDetallePDF" class="bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-4 py-2 font-semibold">📄 PDF</button>
+                <button onclick="cerrarDetalle()" class="bg-slate-200 hover:bg-slate-300 rounded-lg px-4 py-2 font-semibold ml-auto">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // SUPABASE - CONFIGURACIÓN
+    // ============================================================
+    // Crea tu proyecto en https://supabase.com/ y coloca aquí:
+    // 1) Project URL
+    // 2) Publishable/anon key
+    // Nunca pongas la service_role key en este HTML.
+
+    const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+    const SUPABASE_ANON_KEY = "TU-PUBLISHABLE-ANON-KEY";
+    const SUPABASE_BUCKET = "planos";
+
+    const { createClient } = window.supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    window.supabaseClient = supabaseClient;
+    window.supabaseDB = supabaseClient;
+    window.supabaseStorage = supabaseClient.storage;
+
+    // Capa pequeña de compatibilidad para que la lógica de la interfaz
+    // conserve una estructura sencilla mientras todo se ejecuta en Supabase.
+    window.supabaseList = {
+        collection(_db, table) {
+            return { table };
+        },
+        async getDocs(collectionRef) {
+            const { data, error } = await supabaseClient
+                .from(collectionRef.table)
+                .select("*");
+            if (error) throw error;
+            return {
+                empty: !data || data.length === 0,
+                docs: (data || []).map(row => ({
+                    id: row.id,
+                    data: () => row
+                }))
+            };
+        },
+        doc(_db, table, id) {
+            return { table, id };
+        },
+        async addDoc(collectionRef, payload) {
+            const { data, error } = await supabaseClient
+                .from(collectionRef.table)
+                .insert(payload)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        async updateDoc(docRef, payload) {
+            const { error } = await supabaseClient
+                .from(docRef.table)
+                .update(payload)
+                .eq("id", docRef.id);
+            if (error) throw error;
+        },
+        async deleteDoc(docRef) {
+            const { error } = await supabaseClient
+                .from(docRef.table)
+                .delete()
+                .eq("id", docRef.id);
+            if (error) throw error;
+        },
+        ref(_storage, path) {
+            return { path };
+        },
+        async uploadBytes(storageRef, file, options = {}) {
+            const { data, error } = await supabaseClient.storage
+                .from(SUPABASE_BUCKET)
+                .upload(storageRef.path, file, {
+                    contentType: options.contentType || file.type || "application/octet-stream",
+                    upsert: false
+                });
+            if (error) throw error;
+            return data;
+        },
+        async getDownloadURL(storageRef) {
+            const { data } = supabaseClient.storage
+                .from(SUPABASE_BUCKET)
+                .getPublicUrl(storageRef.path);
+            if (!data?.publicUrl) throw new Error("No se pudo obtener la URL pública del archivo.");
+            return data.publicUrl;
+        },
+        async deleteObject(storageRef) {
+            const { error } = await supabaseClient.storage
+                .from(SUPABASE_BUCKET)
+                .remove([storageRef.path]);
+            if (error) throw error;
+        },
+        serverTimestamp() {
+            return new Date().toISOString();
+        }
+    };
+
+    async function inicializarSupabase() {
+        try {
+            if (SUPABASE_URL.includes("TU-PROYECTO") || SUPABASE_ANON_KEY.includes("TU-PUBLISHABLE")) {
+                throw new Error("Faltan SUPABASE_URL y SUPABASE_ANON_KEY. Sustitúyelos en el código.");
             }
 
-            const fileUrl = URL.createObjectURL(file);
-            texto.classList.add('hidden');
+            // Prueba real de conexión/consulta.
+            const { error } = await supabaseClient.from("piezas").select("id", { head: true, count: "exact" });
+            if (error) throw error;
 
-            if (file.type === "application/pdf") {
-                img.classList.add('hidden');
-                img.src = "";
-                iframe.src = fileUrl;
-                iframe.classList.remove('hidden');
-            } else if (file.type.startsWith("image/")) {
-                iframe.classList.add('hidden');
-                iframe.src = "";
-                img.src = fileUrl;
-                img.classList.remove('hidden');
+            window.supabaseReady = true;
+            const estado = document.getElementById("estadoConexion");
+            if (estado) {
+                estado.textContent = "Supabase conectado";
+                estado.className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
             }
+            await cargarTodo();
+        } catch (error) {
+            console.error("Supabase:", error);
+            window.supabaseReady = false;
+            const tbody = document.getElementById("tablaPiezasBody");
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-red-600 font-semibold">
+                    No se pudo conectar con Supabase. Revisa SUPABASE_URL, la clave publishable/anon,
+                    las tablas y las políticas RLS. Error: ${escapeHtml(error.message || error)}
+                </td></tr>`;
+            }
+            const estado = document.getElementById("estadoConexion");
+            if (estado) {
+                estado.textContent = "Supabase sin conexión";
+                estado.className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
+            }
+            const msg = document.getElementById("mensajeEscaner");
+            if (msg) msg.textContent = "Supabase no está conectado; el escaneo de cámara funciona, pero no podrá localizar piezas hasta corregir la conexión.";
+        }
+    }
+
+    window.addEventListener("DOMContentLoaded", inicializarSupabase);
+</script>
+
+<script>
+    // =========================
+    // ESTADO LOCAL
+    // =========================
+    let piezas = [];
+    let solicitudes = [];
+    let escaner = null;
+    let escanerActivo = false;
+    let piezaDetalleActual = null;
+    let previewObjectUrl = null;
+
+    const $ = id => document.getElementById(id);
+
+    // =========================
+    // UTILIDADES
+    // =========================
+    function escapeHtml(value = "") {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function normalizar(value = "") {
+        return String(value).trim().toUpperCase();
+    }
+
+    function fechaTexto(timestamp) {
+        if (!timestamp) return "—";
+        let fecha = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+        if (Number.isNaN(fecha.getTime())) return "—";
+        return fecha.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+    }
+
+    function estadoStock(pieza) {
+        const stock = Number(pieza.stockActual || 0);
+        const min = Number(pieza.stockMin || 0);
+        if (stock === 0) return { texto: "SIN STOCK", clase: "bg-red-100 text-red-700" };
+        if (stock <= min) return { texto: "BAJO MÍNIMO", clase: "bg-amber-100 text-amber-700" };
+        return { texto: "OK", clase: "bg-emerald-100 text-emerald-700" };
+    }
+
+    function mostrarSeccion(seccion) {
+        $("seccionInventario").classList.toggle("hidden", seccion !== "inventario");
+        $("seccionSolicitudes").classList.toggle("hidden", seccion !== "solicitudes");
+        if (seccion === "solicitudes") {
+            cargarSolicitudes();
+        }
+    }
+
+    function actualizarCodigoVistaPrevia() {
+        const cat = $("categoria").value;
+        const proc = $("proceso").value;
+        const editando = !!$("editDocId").value;
+        $("codigoGeneradoVista").textContent = editando
+            ? (piezaDetalleActual?.codigoPieza || `${cat}S${proc}-P-001`)
+            : `${cat}S${proc}-P-###`;
+    }
+
+    // =========================
+    // SUPABASE: CARGAR DATOS
+    // =========================
+    async function cargarTodo() {
+        await cargarPiezas();
+        await cargarSolicitudes();
+    }
+
+    async function cargarPiezas() {
+        if (!window.supabaseReady) return;
+
+        const snap = await window.supabaseList.getDocs(
+            window.supabaseList.collection(window.supabaseDB, "piezas")
+        );
+
+        piezas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        piezas.sort((a, b) => {
+            const na = Number(a.consecutivoNumero || 0);
+            const nb = Number(b.consecutivoNumero || 0);
+            return nb - na;
+        });
+
+        actualizarFiltros();
+        llenarSelectPiezasSolicitud();
+        actualizarEstadisticas();
+        aplicarFiltros();
+    }
+
+    async function cargarSolicitudes() {
+        if (!window.supabaseReady) return;
+
+        const snap = await window.supabaseList.getDocs(
+            window.supabaseList.collection(window.supabaseDB, "solicitudesPiezas")
+        );
+
+        solicitudes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        solicitudes.sort((a, b) => {
+            const ta = a.fechaSolicitud?.toMillis ? a.fechaSolicitud.toMillis() : 0;
+            const tb = b.fechaSolicitud?.toMillis ? b.fechaSolicitud.toMillis() : 0;
+            return tb - ta;
+        });
+
+        actualizarEstadisticas();
+        renderSolicitudes();
+    }
+
+    // =========================
+    // FILTROS
+    // =========================
+    function actualizarFiltros() {
+        llenarOpciones("filtroMaterial", [...new Set(piezas.map(p => normalizar(p.material)).filter(Boolean))]);
+        llenarOpciones("filtroCalibre", [...new Set(piezas.map(p => String(p.calibre || "").trim()).filter(Boolean))]);
+        llenarOpciones("filtroCategoria", [...new Set(piezas.map(p => p.categoria).filter(Boolean))], {
+            V: "Volteo", L: "Lowboy", G: "Góndola", X: "Genérico"
+        });
+    }
+
+    function llenarOpciones(id, valores, nombres = {}) {
+        const select = $(id);
+        const actual = select.value;
+        const primera = select.options[0]?.textContent || "Todos";
+        select.innerHTML = `<option value="">${primera}</option>`;
+
+        valores.sort((a, b) => String(a).localeCompare(String(b), "es"))
+            .forEach(v => {
+                const option = document.createElement("option");
+                option.value = v;
+                option.textContent = nombres[v] || v;
+                select.appendChild(option);
+            });
+
+        if (valores.includes(actual)) select.value = actual;
+    }
+
+    function aplicarFiltros() {
+        const nombre = normalizar($("filtroNombre").value);
+        const material = normalizar($("filtroMaterial").value);
+        const calibre = String($("filtroCalibre").value || "").trim();
+        const categoria = $("filtroCategoria").value;
+        const estado = $("filtroEstadoStock").value;
+
+        const filtradas = piezas.filter(p => {
+            const coincideNombre = !nombre ||
+                normalizar(p.nombre).includes(nombre) ||
+                normalizar(p.codigoPieza).includes(nombre);
+
+            const coincideMaterial = !material || normalizar(p.material) === material;
+            const coincideCalibre = !calibre || String(p.calibre || "").trim() === calibre;
+            const coincideCategoria = !categoria || p.categoria === categoria;
+
+            const bajo = Number(p.stockActual || 0) <= Number(p.stockMin || 0);
+            const cero = Number(p.stockActual || 0) === 0;
+            const coincideEstado =
+                !estado ||
+                (estado === "BAJO" && bajo) ||
+                (estado === "OK" && !bajo) ||
+                (estado === "CERO" && cero);
+
+            return coincideNombre && coincideMaterial && coincideCalibre && coincideCategoria && coincideEstado;
+        });
+
+        renderTablaPiezas(filtradas);
+        $("textoResultados").textContent = `${filtradas.length} resultado(s) de ${piezas.length}`;
+    }
+
+    function limpiarFiltros() {
+        $("filtroNombre").value = "";
+        $("filtroMaterial").value = "";
+        $("filtroCalibre").value = "";
+        $("filtroCategoria").value = "";
+        $("filtroEstadoStock").value = "";
+        aplicarFiltros();
+    }
+
+    // =========================
+    // TABLA INVENTARIO
+    // =========================
+    function renderTablaPiezas(lista) {
+        const tbody = $("tablaPiezasBody");
+
+        if (!lista.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">No hay piezas que coincidan con el filtro.</td></tr>`;
+            return;
         }
 
-        function actualizarCodigoVistaPrevia() {
-            const cat = document.getElementById('categoria').value;
-            const proc = document.getElementById('proceso').value;
-            document.getElementById('codigoGeneradoVista').innerText = `${cat}S${proc}-P-***`;
+        tbody.innerHTML = lista.map(p => {
+            const estado = estadoStock(p);
+            return `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-semibold">${escapeHtml(p.numero || "—")}</td>
+                    <td class="p-2.5 font-mono font-bold text-orange-700">${escapeHtml(p.codigoPieza || "—")}</td>
+                    <td class="p-2.5">
+                        <button onclick="verDetalle('${p.id}')" class="text-left font-semibold hover:text-orange-700 hover:underline">
+                            ${escapeHtml(p.nombre || "SIN NOMBRE")}
+                        </button>
+                    </td>
+                    <td class="p-2.5">${escapeHtml(p.material || "—")}</td>
+                    <td class="p-2.5">${escapeHtml(p.calibre || "—")}</td>
+                    <td class="p-2.5 text-center font-bold">${Number(p.stockActual || 0)}</td>
+                    <td class="p-2.5">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${estado.clase}">
+                            ${estado.texto}
+                        </span>
+                    </td>
+                    <td class="p-2.5">
+                        ${p.archivoUrl
+                            ? `<a href="${escapeHtml(p.archivoUrl)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline font-semibold">Ver</a>`
+                            : `<span class="text-slate-400">—</span>`}
+                    </td>
+                    <td class="p-2.5">
+                        <div class="flex flex-wrap gap-1">
+                            <button onclick="editarPieza('${p.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold">✏️</button>
+                            <button onclick="solicitarDesdeTabla('${p.id}')" class="bg-orange-50 hover:bg-orange-100 text-orange-700 px-2 py-1 rounded font-semibold">📝</button>
+                            <button onclick="descargarPiezaPDF('${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded font-semibold">📄</button>
+                            <button onclick="eliminarPieza('${p.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join("");
+    }
+
+    // =========================
+    // FORMULARIO PIEZA
+    // =========================
+    async function guardarPieza(e) {
+        e.preventDefault();
+
+        if (!window.supabaseReady) {
+            alert("Supabase no está listo. Revisa la autenticación anónima y las reglas.");
+            return;
         }
 
-        // Obtener consecutivo siguiente desde Supabase
-        async function obtenerSiguienteConsecutivo(proceso) {
-            try {
-                const { data, error } = await supabase
-                    .from('piezas')
-                    .select('consecutivoNumero')
-                    .eq('procesoLetra', proceso)
-                    .order('consecutivoNumero', { ascending: false })
-                    .limit(1);
+        const btn = $("btnGuardar");
+        btn.disabled = true;
+        btn.textContent = $("editDocId").value ? "Actualizando..." : "Guardando...";
 
-                if (data && data.length > 0) {
-                    return (data[0].consecutivoNumero || 0) + 1;
+        try {
+            const editId = $("editDocId").value.trim();
+            const cat = $("categoria").value;
+            const proc = $("proceso").value;
+
+            const nombre = normalizar($("nombre").value);
+            const material = normalizar($("material").value);
+            const calibre = $("calibre").value.trim();
+            const aplicacion = $("aplicacion").value.trim();
+
+            const stockActual = Math.max(0, parseInt($("stockActual").value, 10) || 0);
+            const stockMin = Math.max(0, parseInt($("stockMin").value, 10) || 0);
+            const stockMax = Math.max(1, parseInt($("stockMax").value, 10) || 1);
+
+            if (stockMax < stockMin) {
+                throw new Error("El stock máximo no puede ser menor al stock mínimo.");
+            }
+
+            // ---- Archivo nuevo ----
+            let archivoUrl = $("archivoUrlActual").value || "";
+            let archivoPath = $("archivoPathActual").value || "";
+            let archivoNombre = $("archivoNombreActual").value || "";
+            let archivoTipo = $("archivoTipoActual").value || "";
+
+            const inputArchivo = $("archivoPlano");
+            const nuevoArchivo = inputArchivo.files?.[0] || null;
+            const quitarArchivo = $("quitarArchivo").value === "1";
+
+            if (nuevoArchivo) {
+                validarArchivo(nuevoArchivo);
+
+                const extension = nuevoArchivo.name.split(".").pop().toLowerCase();
+                const nombreSeguro = nuevoArchivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+                const pathNuevo = `planos/${crypto.randomUUID()}_${nombreSeguro}`;
+
+                mostrarProgresoArchivo(true, 10, "Subiendo...");
+                const storageRef = window.supabaseList.ref(window.supabaseStorage, pathNuevo);
+                await window.supabaseList.uploadBytes(storageRef, nuevoArchivo, {
+                    contentType: nuevoArchivo.type || (extension === "pdf" ? "application/pdf" : "image/*")
+                });
+                mostrarProgresoArchivo(true, 80, "Obteniendo enlace...");
+                archivoUrl = await window.supabaseList.getDownloadURL(storageRef);
+                archivoPath = pathNuevo;
+                archivoNombre = nuevoArchivo.name;
+                archivoTipo = nuevoArchivo.type || "";
+                mostrarProgresoArchivo(true, 100, "Listo");
+            } else if (quitarArchivo) {
+                archivoUrl = "";
+                archivoPath = "";
+                archivoNombre = "";
+                archivoTipo = "";
+            }
+
+            if (editId) {
+                const piezaRef = window.supabaseList.doc(window.supabaseDB, "piezas", editId);
+                await window.supabaseList.updateDoc(piezaRef, {
+                    categoria: cat,
+                    procesoLetra: proc,
+                    nombre,
+                    material,
+                    calibre,
+                    aplicacion,
+                    stockActual,
+                    stockMin,
+                    stockMax,
+                    puntoReorden: stockActual <= stockMin ? "SI" : "NO",
+                    archivoUrl,
+                    archivoPath,
+                    archivoNombre,
+                    archivoTipo,
+                    fechaActualizacion: window.supabaseList.serverTimestamp()
+                });
+
+                // Borra el archivo anterior únicamente después de guardar correctamente el nuevo.
+                const rutaAnterior = piezaDetalleActual?.archivoPath || $("archivoPathActual").dataset.oldPath || "";
+                if (nuevoArchivo && rutaAnterior && rutaAnterior !== archivoPath) {
+                    try {
+                        await window.supabaseList.deleteObject(
+                            window.supabaseList.ref(window.supabaseStorage, rutaAnterior)
+                        );
+                    } catch (err) {
+                        console.warn("No se pudo borrar el archivo anterior:", err);
+                    }
                 }
-            } catch (e) {
-                console.log("Primer registro para el proceso...", e);
-            }
-            return 1;
-        }
 
-        // Guardar Pieza en Supabase
-        async function guardarPieza(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btnGuardar');
-            btn.disabled = true;
-            btn.innerText = "Guardando...";
+                if (quitarArchivo && !nuevoArchivo && rutaAnterior) {
+                    try {
+                        await window.supabaseList.deleteObject(
+                            window.supabaseList.ref(window.supabaseStorage, rutaAnterior)
+                        );
+                    } catch (err) {
+                        console.warn("No se pudo borrar el archivo anterior:", err);
+                    }
+                }
 
-            try {
-                const cat = document.getElementById('categoria').value;
-                const proc = document.getElementById('proceso').value;
-                
-                const numConsecutivo = await obtenerSiguienteConsecutivo(proc);
-                const numFormateado = "P-" + String(numConsecutivo).padStart(3, '0');
+                alert(`Pieza ${piezaDetalleActual?.codigoPieza || ""} actualizada correctamente.`);
+            } else {
+                // Consecutivo seguro por categoría + proceso mediante función RPC de PostgreSQL.
+                const { data: numConsecutivo, error: errorConsecutivo } = await window.supabaseClient
+                    .rpc("siguiente_consecutivo", {
+                        p_categoria: cat,
+                        p_proceso: proc
+                    });
+                if (errorConsecutivo) throw errorConsecutivo;
+
+                const numFormateado = `P-${String(numConsecutivo).padStart(3, "0")}`;
                 const codigoPieza = `${cat}S${proc}-${numFormateado}`;
 
-                // Subir archivo al bucket "planos"
-                let archivoUrl = "";
-                const inputArchivo = document.getElementById('archivoPlano');
-                
-                if (inputArchivo && inputArchivo.files && inputArchivo.files.length > 0) {
-                    const file = inputArchivo.files[0];
-                    const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-                    
-                    const { data: uploadData, error: uploadError } = await supabase
-                        .storage
-                        .from('planos')
-                        .upload(fileName, file);
-
-                    if (uploadError) throw uploadError;
-
-                    const { data: urlData } = supabase
-                        .storage
-                        .from('planos')
-                        .getPublicUrl(fileName);
-
-                    archivoUrl = urlData.publicUrl;
-                }
-
-                const stockActual = parseInt(document.getElementById('stockActual').value) || 0;
-                const stockMin = parseInt(document.getElementById('stockMin').value) || 0;
-                const stockMax = parseInt(document.getElementById('stockMax').value) || 1;
-                const puntoReorden = stockActual <= stockMin ? "SI" : "NO";
-
-                // Insertar registro en la tabla "piezas"
-                const { error: insertError } = await supabase
-                    .from('piezas')
-                    .insert([{
+                await window.supabaseList.addDoc(
+                    window.supabaseList.collection(window.supabaseDB, "piezas"),
+                    {
                         numero: numFormateado,
-                        codigoPieza: codigoPieza,
+                        codigoPieza,
                         categoria: cat,
                         procesoLetra: proc,
                         consecutivoNumero: numConsecutivo,
-                        nombre: (document.getElementById('nombre').value || '').toUpperCase(),
-                        material: (document.getElementById('material').value || '').toUpperCase(),
-                        calibre: document.getElementById('calibre').value || '',
-                        aplicacion: document.getElementById('aplicacion').value || '',
-                        stockActual: stockActual,
-                        stockMin: stockMin,
-                        stockMax: stockMax,
-                        puntoReorden: puntoReorden,
-                        archivoUrl: archivoUrl
-                    }]);
+                        nombre,
+                        material,
+                        calibre,
+                        aplicacion,
+                        stockActual,
+                        stockMin,
+                        stockMax,
+                        puntoReorden: stockActual <= stockMin ? "SI" : "NO",
+                        archivoUrl,
+                        archivoPath,
+                        archivoNombre,
+                        archivoTipo,
+                        fechaRegistro: window.supabaseList.serverTimestamp()
+                    }
+                );
 
-                if (insertError) throw insertError;
-
-                alert(`Pieza registrada con éxito: ${codigoPieza}`);
-                
-                document.getElementById('formPieza').reset();
-                document.getElementById('archivoPlano').value = "";
-                previsualizarArchivo({ target: null });
-                actualizarCodigoVistaPrevia();
-                cargarTablaPiezas();
-
-            } catch (error) {
-                console.error("Error al guardar: ", error);
-                alert("Error al guardar la pieza: " + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Guardar Pieza en Stock";
+                alert(`Pieza registrada correctamente: ${codigoPieza}`);
             }
+
+            resetFormulario();
+            await cargarPiezas();
+
+        } catch (error) {
+            console.error("Error al guardar:", error);
+
+            let mensaje = error?.message || "Error desconocido.";
+            if (mensaje.includes("storage/unauthorized")) {
+                mensaje = "Supabase Storage rechazó el archivo. Revisa las reglas de Storage y que Authentication > Anonymous esté activa.";
+            } else if (mensaje.includes("storage/unknown")) {
+                mensaje = "Supabase Storage no pudo completar la carga. Revisa el bucket y la conexión.";
+            } else if (mensaje.includes("permission-denied")) {
+                mensaje = "base de datos de Supabase rechazó la operación. Revisa las reglas de base de datos de Supabase y la autenticación.";
+            }
+
+            alert("No se pudo guardar: " + mensaje);
+
+        } finally {
+            btn.disabled = false;
+            btn.textContent = $("editDocId").value ? "💾 Actualizar pieza" : "💾 Guardar pieza";
+            setTimeout(() => mostrarProgresoArchivo(false), 500);
+        }
+    }
+
+    function validarArchivo(file) {
+        const tipos = ["application/pdf", "image/jpeg", "image/png"];
+        const extensiones = [".pdf", ".jpg", ".jpeg", ".png"];
+        const nombre = file.name.toLowerCase();
+
+        if (!tipos.includes(file.type) && !extensiones.some(ext => nombre.endsWith(ext))) {
+            throw new Error("El archivo debe ser PDF, JPG, JPEG o PNG.");
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            throw new Error("El archivo supera el límite de 10 MB.");
+        }
+    }
+
+    function mostrarProgresoArchivo(mostrar, porcentaje = 0, texto = "") {
+        $("progresoArchivo").classList.toggle("hidden", !mostrar);
+        $("barraProgreso").style.width = `${porcentaje}%`;
+        $("textoProgreso").textContent = texto || `${porcentaje}%`;
+    }
+
+    function previsualizarArchivo(event) {
+        const file = event.target.files?.[0];
+        const iframe = $("pdfVisor");
+        const img = $("imgVisor");
+        const texto = $("textoVisorVacio");
+
+        if (previewObjectUrl) {
+            URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = null;
         }
 
-        // Cargar registros en la tabla
-        async function cargarTablaPiezas() {
-            const tbody = document.getElementById('tablaPiezasBody');
-            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">Cargando inventario...</td></tr>';
+        if (!file) {
+            iframe.src = "";
+            img.src = "";
+            iframe.classList.add("hidden");
+            img.classList.add("hidden");
+            texto.classList.remove("hidden");
+            $("estadoArchivo").textContent = "Sin archivo";
+            return;
+        }
 
-            try {
-                const { data, error } = await supabase
-                    .from('piezas')
-                    .select('*')
-                    .order('id', { ascending: false });
+        try {
+            validarArchivo(file);
+        } catch (error) {
+            alert(error.message);
+            event.target.value = "";
+            return;
+        }
 
-                if (error) throw error;
+        previewObjectUrl = URL.createObjectURL(file);
+        texto.classList.add("hidden");
+        $("estadoArchivo").textContent = file.name;
 
-                tbody.innerHTML = '';
+        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            img.classList.add("hidden");
+            img.src = "";
+            iframe.src = previewObjectUrl;
+            iframe.classList.remove("hidden");
+        } else {
+            iframe.classList.add("hidden");
+            iframe.src = "";
+            img.src = previewObjectUrl;
+            img.classList.remove("hidden");
+        }
+    }
 
-                if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay piezas registradas aún.</td></tr>';
-                    return;
+    function limpiarArchivoSeleccionado() {
+        $("archivoPlano").value = "";
+        previsualizarArchivo({ target: { files: [] } });
+    }
+
+    function quitarArchivoExistente() {
+        if (!$("archivoUrlActual").value) return;
+        $("quitarArchivo").value = "1";
+        $("archivoUrlActual").value = "";
+        $("archivoPathActual").dataset.oldPath = $("archivoPathActual").value;
+        $("archivoPathActual").value = "";
+        $("archivoNombreActual").value = "";
+        $("archivoTipoActual").value = "";
+        $("btnQuitarArchivoExistente").classList.add("hidden");
+        limpiarArchivoSeleccionado();
+        $("estadoArchivo").textContent = "Archivo guardado eliminado al actualizar";
+    }
+
+    async function editarPieza(id) {
+        const pieza = piezas.find(p => p.id === id);
+        if (!pieza) return;
+
+        piezaDetalleActual = pieza;
+
+        $("editDocId").value = pieza.id;
+        $("categoria").value = pieza.categoria || "V";
+        $("proceso").value = pieza.procesoLetra || "D";
+        $("nombre").value = pieza.nombre || "";
+        $("material").value = pieza.material || "";
+        $("calibre").value = pieza.calibre || "";
+        $("aplicacion").value = pieza.aplicacion || "";
+        $("stockActual").value = Number(pieza.stockActual || 0);
+        $("stockMin").value = Number(pieza.stockMin || 0);
+        $("stockMax").value = Number(pieza.stockMax || 1);
+
+        $("archivoUrlActual").value = pieza.archivoUrl || "";
+        $("archivoPathActual").value = pieza.archivoPath || "";
+        $("archivoPathActual").dataset.oldPath = pieza.archivoPath || "";
+        $("archivoNombreActual").value = pieza.archivoNombre || "";
+        $("archivoTipoActual").value = pieza.archivoTipo || "";
+        $("quitarArchivo").value = "0";
+
+        $("tituloFormulario").textContent = `Editar ${pieza.codigoPieza || "pieza"}`;
+        $("estadoEdicion").classList.remove("hidden");
+        $("btnCancelarEdicion").classList.remove("hidden");
+        $("btnGuardar").textContent = "💾 Actualizar pieza";
+
+        if (pieza.archivoUrl) {
+            mostrarArchivoGuardado(pieza.archivoUrl, pieza.archivoTipo, pieza.archivoNombre);
+            $("btnQuitarArchivoExistente").classList.remove("hidden");
+            $("estadoArchivo").textContent = pieza.archivoNombre || "Archivo guardado";
+        } else {
+            $("btnQuitarArchivoExistente").classList.add("hidden");
+            limpiarArchivoSeleccionado();
+        }
+
+        actualizarCodigoVistaPrevia();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function mostrarArchivoGuardado(url, tipo = "", nombre = "") {
+        const iframe = $("pdfVisor");
+        const img = $("imgVisor");
+        const texto = $("textoVisorVacio");
+
+        texto.classList.add("hidden");
+
+        const esPdf = tipo === "application/pdf" || String(nombre).toLowerCase().endsWith(".pdf");
+        if (esPdf) {
+            img.classList.add("hidden");
+            iframe.src = url;
+            iframe.classList.remove("hidden");
+        } else {
+            iframe.classList.add("hidden");
+            img.src = url;
+            img.classList.remove("hidden");
+        }
+    }
+
+    function cancelarEdicion() {
+        resetFormulario();
+    }
+
+    function resetFormulario() {
+        $("formPieza").reset();
+        $("editDocId").value = "";
+        $("archivoUrlActual").value = "";
+        $("archivoPathActual").value = "";
+        $("archivoPathActual").dataset.oldPath = "";
+        $("archivoNombreActual").value = "";
+        $("archivoTipoActual").value = "";
+        $("quitarArchivo").value = "0";
+
+        $("tituloFormulario").textContent = "Registrar nueva pieza";
+        $("estadoEdicion").classList.add("hidden");
+        $("btnCancelarEdicion").classList.add("hidden");
+        $("btnQuitarArchivoExistente").classList.add("hidden");
+        $("btnGuardar").textContent = "💾 Guardar pieza";
+        $("stockActual").value = 0;
+        $("stockMin").value = 1;
+        $("stockMax").value = 5;
+
+        $("categoria").value = "V";
+        $("proceso").value = "D";
+
+        limpiarArchivoSeleccionado();
+        piezaDetalleActual = null;
+        actualizarCodigoVistaPrevia();
+    }
+
+    // =========================
+    // ELIMINAR
+    // =========================
+    async function eliminarPieza(id) {
+        const pieza = piezas.find(p => p.id === id);
+        if (!pieza) return;
+
+        const confirmar = confirm(
+            `¿Seguro que quieres eliminar ${pieza.codigoPieza} - ${pieza.nombre}?\n\nEsta acción eliminará el registro de base de datos de Supabase.`
+        );
+        if (!confirmar) return;
+
+        try {
+            await window.supabaseList.deleteDoc(
+                window.supabaseList.doc(window.supabaseDB, "piezas", id)
+            );
+
+            if (pieza.archivoPath) {
+                try {
+                    await window.supabaseList.deleteObject(
+                        window.supabaseList.ref(window.supabaseStorage, pieza.archivoPath)
+                    );
+                } catch (err) {
+                    console.warn("Registro eliminado, pero el archivo no pudo borrarse:", err);
                 }
-
-                data.forEach((item) => {
-                    const reordenColor = item.puntoReorden === "SI" ? "bg-green-100 text-green-800 font-bold" : "bg-gray-100 text-gray-600";
-                    
-                    const fila = `
-                        <tr class="hover:bg-gray-50 border-b">
-                            <td class="p-2 font-semibold">${item.numero}</td>
-                            <td class="p-2 font-mono text-orange-700 font-bold">${item.codigoPieza}</td>
-                            <td class="p-2">${item.nombre}</td>
-                            <td class="p-2">${item.material} / Cal. ${item.calibre}</td>
-                            <td class="p-2 font-bold">${item.stockActual}</td>
-                            <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${reordenColor}">${item.puntoReorden}</span></td>
-                            <td class="p-2 text-center">
-                                ${item.archivoUrl ? `<a href="${item.archivoUrl}" target="_blank" class="text-blue-600 underline">Ver Plano</a>` : '-'}
-                            </td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += fila;
-                });
-            } catch (e) {
-                console.error(e);
-                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-red-500">Error al cargar datos. Revisa tus credenciales de Supabase.</td></tr>';
             }
+
+            alert("Pieza eliminada correctamente.");
+            if ($("editDocId").value === id) resetFormulario();
+            await cargarPiezas();
+            cerrarDetalle();
+
+        } catch (error) {
+            console.error(error);
+            alert("No se pudo eliminar: " + (error.message || error));
+        }
+    }
+
+    // =========================
+    // DETALLE
+    // =========================
+    function verDetalle(id) {
+        const pieza = piezas.find(p => p.id === id);
+        if (!pieza) return;
+
+        piezaDetalleActual = pieza;
+
+        $("detalleTitulo").textContent = pieza.nombre || "Pieza";
+        $("detalleCodigo").textContent = pieza.codigoPieza || "Sin código";
+        $("dNombre").textContent = pieza.nombre || "—";
+        $("dMaterial").textContent = pieza.material || "—";
+        $("dCalibre").textContent = pieza.calibre || "—";
+        $("dAplicacion").textContent = pieza.aplicacion || "—";
+        $("dStock").textContent = `${Number(pieza.stockActual || 0)} unidades (min. ${Number(pieza.stockMin || 0)}, máx. ${Number(pieza.stockMax || 0)})`;
+
+        const estado = estadoStock(pieza);
+        $("dEstado").innerHTML = `<span class="px-2 py-1 rounded-full text-xs font-bold ${estado.clase}">${estado.texto}</span>`;
+
+        $("qrDetalle").innerHTML = "";
+        if (window.QRCode) {
+            new QRCode($("qrDetalle"), {
+                text: pieza.codigoPieza || "",
+                width: 170,
+                height: 170,
+                correctLevel: QRCode.CorrectLevel.M
+            });
         }
 
-        // Módulo de Escáner QR
-        function toggleEscaner() {
-            const modal = document.getElementById('modalEscaner');
-            modal.classList.toggle('hidden');
-
-            if (!modal.classList.contains('hidden')) {
-                html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 200, height: 200 } });
-                html5QrcodeScanner.render((decodedText) => {
-                    alert(`Código Escaneado: ${decodedText}`);
-                    html5QrcodeScanner.clear();
-                    modal.classList.add('hidden');
-                });
-            } else if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-            }
+        $("barcodeDetalle").innerHTML = "";
+        if (window.JsBarcode && pieza.codigoPieza) {
+            JsBarcode("#barcodeDetalle", pieza.codigoPieza, {
+                format: "CODE128",
+                displayValue: true,
+                fontSize: 12,
+                height: 45,
+                margin: 4
+            });
         }
 
-        // Cargar registros al abrir la página
-        window.onload = cargarTablaPiezas;
-    </script>
+        if (pieza.archivoUrl) {
+            $("detalleArchivo").innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-lg p-3">
+                    <div>
+                        <div class="font-semibold">Archivo asociado</div>
+                        <div class="text-xs text-slate-500">${escapeHtml(pieza.archivoNombre || "Plano / imagen")}</div>
+                    </div>
+                    <a href="${escapeHtml(pieza.archivoUrl)}" target="_blank" rel="noopener"
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+                        Abrir archivo
+                    </a>
+                </div>`;
+        } else {
+            $("detalleArchivo").innerHTML = `
+                <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-500">
+                    Esta pieza no tiene PDF o imagen asociado.
+                </div>`;
+        }
+
+        $("btnDetalleEditar").onclick = () => {
+            cerrarDetalle();
+            editarPieza(id);
+        };
+        $("btnDetalleSolicitud").onclick = () => solicitarDesdeTabla(id);
+        $("btnDetallePDF").onclick = () => descargarPiezaPDF(id);
+
+        $("modalDetalle").classList.remove("hidden");
+    }
+
+    function cerrarDetalle() {
+        $("modalDetalle").classList.add("hidden");
+    }
+
+    // =========================
+    // ESCÁNER
+    // =========================
+    async function abrirEscaner() {
+        $("modalEscaner").classList.remove("hidden");
+        $("mensajeEscaner").textContent = "Buscando cámaras...";
+        await detectarCamaras();
+    }
+
+    async function cerrarEscaner() {
+        await detenerCamara();
+        $("modalEscaner").classList.add("hidden");
+    }
+
+    async function detectarCamaras() {
+        const select = $("camaraSelect");
+        select.innerHTML = `<option value="">Detectando cámaras...</option>`;
+
+        if (!window.Html5Qrcode) {
+            $("mensajeEscaner").textContent = "No se cargó la librería del escáner. Revisa la conexión a internet.";
+            return;
+        }
+
+        try {
+            const cameras = await Html5Qrcode.getCameras();
+
+            if (!cameras?.length) {
+                select.innerHTML = `<option value="">No se detectaron cámaras</option>`;
+                $("mensajeEscaner").innerHTML =
+                    "El navegador no entregó una cámara. Comprueba permisos del sitio y usa <b>HTTPS o localhost</b>.";
+                return;
+            }
+
+            select.innerHTML = cameras.map((cam, i) =>
+                `<option value="${escapeHtml(cam.id)}">${escapeHtml(cam.label || `Cámara ${i + 1}`)}</option>`
+            ).join("");
+
+            // Preferir cámara trasera.
+            const trasera = cameras.find(c => /back|rear|environment|trasera/i.test(c.label || ""));
+            if (trasera) select.value = trasera.id;
+
+            $("mensajeEscaner").textContent = `${cameras.length} cámara(s) detectada(s). Presiona "Iniciar".`;
+
+        } catch (error) {
+            console.error(error);
+            select.innerHTML = `<option value="">No se pudo acceder a las cámaras</option>`;
+            $("mensajeEscaner").textContent =
+                "Permiso de cámara rechazado o contexto no seguro. Abre el sitio mediante HTTPS o localhost y acepta el permiso.";
+        }
+    }
+
+    async function iniciarCamara() {
+        if (!window.Html5Qrcode) {
+            alert("No se cargó la librería del escáner.");
+            return;
+        }
+
+        await detenerCamara();
+
+        const cameraId = $("camaraSelect").value;
+        if (!cameraId) {
+            await detectarCamaras();
+            if (!$("camaraSelect").value) return;
+        }
+
+        const selectedCameraId = $("camaraSelect").value;
+        escaner = new Html5Qrcode("reader");
+
+        const formats = window.Html5QrcodeSupportedFormats;
+        const formatsToSupport = formats ? [
+            formats.QR_CODE,
+            formats.CODE_128,
+            formats.CODE_39,
+            formats.EAN_13,
+            formats.EAN_8,
+            formats.UPC_A,
+            formats.UPC_E,
+            formats.ITF
+        ].filter(Boolean) : undefined;
+
+        try {
+            const config = {
+                fps: 10,
+                qrbox: { width: 300, height: 160 },
+                rememberLastUsedCamera: true,
+                aspectRatio: 1.777778
+            };
+            if (formatsToSupport?.length) config.formatsToSupport = formatsToSupport;
+
+            await escaner.start(
+                selectedCameraId,
+                config,
+                async decodedText => {
+                    await procesarCodigoEscaneado(decodedText);
+                },
+                () => {}
+            );
+
+            escanerActivo = true;
+            $("mensajeEscaner").innerHTML = "Escaneando... apunta al QR o código de barras de la pieza.";
+
+        } catch (error) {
+            console.error(error);
+            escaner = null;
+            escanerActivo = false;
+            $("mensajeEscaner").innerHTML =
+                "No se pudo iniciar la cámara. Verifica permisos, HTTPS/localhost y que otra aplicación no esté usando la cámara.";
+        }
+    }
+
+    async function detenerCamara() {
+        if (escaner) {
+            try {
+                if (escanerActivo) await escaner.stop();
+                await escaner.clear();
+            } catch (error) {
+                console.warn("Error al detener escáner:", error);
+            }
+        }
+        escaner = null;
+        escanerActivo = false;
+        $("reader").innerHTML = "";
+    }
+
+    async function procesarCodigoEscaneado(codigo) {
+        const limpio = String(codigo || "").trim().toUpperCase();
+        if (!limpio) return;
+
+        $("codigoManual").value = limpio;
+        $("mensajeEscaner").textContent = `Código leído: ${limpio}`;
+
+        await detenerCamara();
+        $("modalEscaner").classList.add("hidden");
+
+        const pieza = piezas.find(p =>
+            normalizar(p.codigoPieza) === limpio ||
+            normalizar(p.numero) === limpio
+        );
+
+        if (pieza) {
+            verDetalle(pieza.id);
+            // Resalta y lleva al registro.
+            setTimeout(() => {
+                aplicarFiltros();
+                const fila = [...$("tablaPiezasBody").querySelectorAll("tr")]
+                    .find(tr => tr.innerText.includes(pieza.codigoPieza));
+                fila?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 200);
+        } else {
+            alert(`El código ${limpio} no está registrado en el inventario.`);
+        }
+    }
+
+    async function buscarCodigoManual() {
+        await procesarCodigoEscaneado($("codigoManual").value);
+    }
+
+    // =========================
+    // SOLICITUDES
+    // =========================
+    function llenarSelectPiezasSolicitud() {
+        const select = $("solicitudPieza");
+        const actual = select.value;
+
+        select.innerHTML = `<option value="">Selecciona una pieza</option>` +
+            piezas
+                .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"))
+                .map(p => `<option value="${p.id}">${escapeHtml(p.codigoPieza)} · ${escapeHtml(p.nombre)} · Stock: ${Number(p.stockActual || 0)}</option>`)
+                .join("");
+
+        if (piezas.some(p => p.id === actual)) select.value = actual;
+    }
+
+    function solicitarDesdeTabla(id) {
+        const pieza = piezas.find(p => p.id === id);
+        if (!pieza) return;
+
+        mostrarSeccion("solicitudes");
+        $("solicitudPieza").value = id;
+        $("solicitudCantidad").value = Math.max(1, Number(pieza.stockMax || 1) - Number(pieza.stockActual || 0));
+        $("solicitudPrioridad").value = Number(pieza.stockActual || 0) === 0 ? "Urgente" : "Alta";
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function guardarSolicitud(e) {
+        e.preventDefault();
+
+        if (!window.supabaseReady) {
+            alert("Supabase no está listo.");
+            return;
+        }
+
+        const btn = $("btnSolicitud");
+        btn.disabled = true;
+        btn.textContent = "Creando...";
+
+        try {
+            const pieza = piezas.find(p => p.id === $("solicitudPieza").value);
+            if (!pieza) throw new Error("Selecciona una pieza válida.");
+
+            await window.supabaseList.addDoc(
+                window.supabaseList.collection(window.supabaseDB, "solicitudesPiezas"),
+                {
+                    piezaId: pieza.id,
+                    codigoPieza: pieza.codigoPieza || "",
+                    nombrePieza: pieza.nombre || "",
+                    cantidad: Math.max(1, parseInt($("solicitudCantidad").value, 10) || 1),
+                    prioridad: $("solicitudPrioridad").value,
+                    solicitante: $("solicitudSolicitante").value.trim(),
+                    motivo: $("solicitudMotivo").value.trim(),
+                    estado: "Pendiente",
+                    fechaSolicitud: window.supabaseList.serverTimestamp()
+                }
+            );
+
+            alert("Solicitud creada correctamente.");
+            $("formSolicitud").reset();
+            $("solicitudCantidad").value = 1;
+            await cargarSolicitudes();
+
+        } catch (error) {
+            console.error(error);
+            alert("No se pudo crear la solicitud: " + (error.message || error));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "📝 Crear solicitud";
+        }
+    }
+
+    function renderSolicitudes() {
+        const filtro = $("filtroSolicitudEstado").value;
+        const lista = solicitudes.filter(s => !filtro || s.estado === filtro);
+        const tbody = $("tablaSolicitudesBody");
+
+        if (!lista.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400">No hay solicitudes.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = lista.map(s => {
+            const prioridadClase =
+                s.prioridad === "Urgente" ? "bg-red-100 text-red-700" :
+                s.prioridad === "Alta" ? "bg-amber-100 text-amber-700" :
+                "bg-slate-100 text-slate-600";
+
+            return `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2.5">${fechaTexto(s.fechaSolicitud)}</td>
+                <td class="p-2.5"><b>${escapeHtml(s.codigoPieza)}</b><br>${escapeHtml(s.nombrePieza)}</td>
+                <td class="p-2.5 font-bold">${Number(s.cantidad || 0)}</td>
+                <td class="p-2.5"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${prioridadClase}">${escapeHtml(s.prioridad || "Normal")}</span></td>
+                <td class="p-2.5">${escapeHtml(s.solicitante || "—")}</td>
+                <td class="p-2.5">
+                    <select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded p-1 text-xs font-semibold">
+                        ${["Pendiente", "En proceso", "Completada", "Cancelada"].map(e =>
+                            `<option value="${e}" ${s.estado === e ? "selected" : ""}>${e}</option>`
+                        ).join("")}
+                    </select>
+                </td>
+                <td class="p-2.5 max-w-[220px]">${escapeHtml(s.motivo || "—")}</td>
+            </tr>`;
+        }).join("");
+    }
+
+    async function cambiarEstadoSolicitud(id, estado) {
+        try {
+            await window.supabaseList.updateDoc(
+                window.supabaseList.doc(window.supabaseDB, "solicitudesPiezas", id),
+                { estado, fechaActualizacion: window.supabaseList.serverTimestamp() }
+            );
+            await cargarSolicitudes();
+        } catch (error) {
+            console.error(error);
+            alert("No se pudo actualizar el estado.");
+        }
+    }
+
+    // =========================
+    // ESTADÍSTICAS
+    // =========================
+    function actualizarEstadisticas() {
+        $("statPiezas").textContent = piezas.length;
+        $("statUnidades").textContent = piezas.reduce((sum, p) => sum + Number(p.stockActual || 0), 0);
+        $("statBajoMin").textContent = piezas.filter(p => Number(p.stockActual || 0) <= Number(p.stockMin || 0)).length;
+        $("statSolicitudes").textContent = solicitudes.filter(s => s.estado === "Pendiente").length;
+    }
+
+    // =========================
+    // PDF
+    // =========================
+    function asegurarPDF() {
+        if (!window.jspdf?.jsPDF) {
+            alert("No se cargó la librería de PDF. Revisa la conexión a internet.");
+            return false;
+        }
+        if (!window.jspdf.jsPDF.prototype.autoTable) {
+            alert("No se cargó AutoTable para PDF.");
+            return false;
+        }
+        return true;
+    }
+
+    function descargarInventarioPDF() {
+        if (!asegurarPDF()) return;
+
+        const lista = obtenerListaFiltrada();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: "landscape" });
+
+        doc.setFontSize(16);
+        doc.text("VOLMEX - Inventario de piezas", 14, 15);
+        doc.setFontSize(9);
+        doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 14, 21);
+
+        const body = lista.map(p => [
+            p.numero || "",
+            p.codigoPieza || "",
+            p.nombre || "",
+            p.material || "",
+            p.calibre || "",
+            String(p.stockActual ?? 0),
+            String(p.stockMin ?? 0),
+            Number(p.stockActual || 0) <= Number(p.stockMin || 0) ? "BAJO" : "OK",
+            p.aplicacion || ""
+        ]);
+
+        doc.autoTable({
+            startY: 27,
+            head: [["No.", "Código", "Nombre", "Material", "Calibre", "Stock", "Mín.", "Estado", "Aplicación"]],
+            body,
+            styles: { fontSize: 7, cellPadding: 2 },
+            headStyles: { fillColor: [234, 88, 12] }
+        });
+
+        doc.save(`VOLMEX_Inventario_${fechaArchivo()}.pdf`);
+    }
+
+    function descargarPiezaPDF(id) {
+        if (!asegurarPDF()) return;
+        const pieza = piezas.find(p => p.id === id);
+        if (!pieza) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const estado = estadoStock(pieza);
+
+        doc.setFontSize(18);
+        doc.text("VOLMEX", 14, 18);
+
+        doc.setFontSize(12);
+        doc.text("Ficha de pieza en stock", 14, 26);
+
+        doc.setFontSize(10);
+        const filas = [
+            ["Código", pieza.codigoPieza || "—"],
+            ["No.", pieza.numero || "—"],
+            ["Nombre", pieza.nombre || "—"],
+            ["Categoría", pieza.categoria || "—"],
+            ["Proceso", pieza.procesoLetra || "—"],
+            ["Material", pieza.material || "—"],
+            ["Calibre / espesor", pieza.calibre || "—"],
+            ["Aplicación", pieza.aplicacion || "—"],
+            ["Stock actual", String(pieza.stockActual ?? 0)],
+            ["Stock mínimo", String(pieza.stockMin ?? 0)],
+            ["Stock máximo", String(pieza.stockMax ?? 0)],
+            ["Estado", estado.texto],
+            ["Archivo", pieza.archivoNombre || "Sin archivo"],
+            ["Registro", fechaTexto(pieza.fechaRegistro)]
+        ];
+
+        doc.autoTable({
+            startY: 33,
+            head: [["Dato", "Información"]],
+            body: filas,
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [234, 88, 12] },
+            columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 } }
+        });
+
+        // Generar QR temporal para integrarlo al PDF.
+        const qrTemp = document.createElement("div");
+        qrTemp.style.position = "fixed";
+        qrTemp.style.left = "-10000px";
+        qrTemp.style.top = "0";
+        document.body.appendChild(qrTemp);
+
+        if (window.QRCode) {
+            new QRCode(qrTemp, {
+                text: pieza.codigoPieza || "",
+                width: 170,
+                height: 170
+            });
+        }
+
+        setTimeout(() => {
+            try {
+                const qrElement = qrTemp.querySelector("canvas") || qrTemp.querySelector("img");
+                const dataUrl = qrElement?.toDataURL ? qrElement.toDataURL("image/png") : qrElement?.src;
+                if (dataUrl) {
+                    doc.addImage(dataUrl, "PNG", 150, 35, 40, 40);
+                }
+            } catch (err) {
+                console.warn("No se pudo insertar QR al PDF:", err);
+            } finally {
+                document.body.removeChild(qrTemp);
+                doc.save(`${pieza.codigoPieza || "pieza"}_${fechaArchivo()}.pdf`);
+            }
+        }, 200);
+    }
+
+    function obtenerListaFiltrada() {
+        const nombre = normalizar($("filtroNombre").value);
+        const material = normalizar($("filtroMaterial").value);
+        const calibre = String($("filtroCalibre").value || "").trim();
+        const categoria = $("filtroCategoria").value;
+        const estado = $("filtroEstadoStock").value;
+
+        return piezas.filter(p => {
+            const n = normalizar(p.nombre);
+            const c = normalizar(p.codigoPieza);
+            const coincideNombre = !nombre || n.includes(nombre) || c.includes(nombre);
+            const coincideMaterial = !material || normalizar(p.material) === material;
+            const coincideCalibre = !calibre || String(p.calibre || "").trim() === calibre;
+            const coincideCategoria = !categoria || p.categoria === categoria;
+
+            const bajo = Number(p.stockActual || 0) <= Number(p.stockMin || 0);
+            const cero = Number(p.stockActual || 0) === 0;
+            const coincideEstado =
+                !estado ||
+                (estado === "BAJO" && bajo) ||
+                (estado === "OK" && !bajo) ||
+                (estado === "CERO" && cero);
+
+            return coincideNombre && coincideMaterial && coincideCalibre && coincideCategoria && coincideEstado;
+        });
+    }
+
+    function fechaArchivo() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+
+    // Cerrar modales haciendo clic en el fondo.
+    $("modalEscaner").addEventListener("click", e => {
+        if (e.target === $("modalEscaner")) cerrarEscaner();
+    });
+
+    $("modalDetalle").addEventListener("click", e => {
+        if (e.target === $("modalDetalle")) cerrarDetalle();
+    });
+
+    actualizarCodigoVistaPrevia();
+</script>
+
 </body>
 </html>
