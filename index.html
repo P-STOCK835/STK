@@ -16,6 +16,10 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+
+    <!-- Librerías para exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body class="bg-slate-100 min-h-screen text-slate-800">
@@ -205,9 +209,16 @@
                 </div>
 
                 <div class="flex items-center justify-between mb-3">
-                    <div id="textoResultados" class="text-xs text-slate-500">0 resultados</div>
-                    <button onclick="limpiarFiltros()" class="text-xs text-orange-700 hover:underline font-semibold">Limpiar filtros</button>
-                </div>
+        <div id="textoResultados" class="text-xs text-slate-500">0 resultados</div>
+        
+        <!-- Nuevo contenedor con el botón de PDF y limpiar filtros -->
+        <div class="flex items-center gap-3">
+            <button onclick="descargarPDFInventario()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                📄 Descargar PDF
+            </button>
+            <button onclick="limpiarFiltros()" class="text-xs text-orange-700 hover:underline font-semibold">Limpiar filtros</button>
+        </div>
+    </div>
 
                 <div class="overflow-x-auto border rounded-lg">
                     <table class="w-full text-xs text-left min-w-[980px]">
@@ -909,6 +920,73 @@ function cerrarEscaner() {
     } else {
         $('modalEscaner').classList.add('hidden');
     }
+}
+
+// =========================================================
+// EXPORTAR INVENTARIO A PDF
+// =========================================================
+function descargarPDFInventario() {
+    // 1. Inicializar jsPDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // 2. Configurar el encabezado del documento
+    doc.setFontSize(14);
+    doc.setTextColor(234, 88, 12); // Naranja VOLMEX
+    doc.text("VOLMEX - Reporte de Inventario", 14, 15);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    
+    // Identificar si hay algún filtro de material activo
+    const filtroMat = document.getElementById("filtroMaterial").value;
+    const textoFiltro = filtroMat ? `Material: ${filtroMat}` : 'Todos los materiales';
+    doc.text(`Filtros: ${textoFiltro} | Fecha: ${new Date().toLocaleDateString()}`, 14, 22);
+
+    // 3. Extraer solo las filas que actualmente se están mostrando en la tabla
+    const tableBody = document.getElementById("tablaPiezasBody");
+    const rows = Array.from(tableBody.querySelectorAll("tr")).filter(tr => {
+        // Omitir la fila de "Cargando..."
+        if (tr.innerText.includes("Cargando...")) return false;
+        // Omitir filas que tu función de filtrado haya ocultado mediante CSS
+        if (tr.style.display === "none") return false;
+        return true;
+    });
+
+    // 4. Mapear las celdas a un arreglo de datos
+    const bodyData = rows.map(tr => {
+        const tds = tr.querySelectorAll("td");
+        if (tds.length >= 6) {
+            return [
+                tds[0].innerText.trim(), // Código
+                tds[1].innerText.trim(), // Nombre
+                tds[2].innerText.trim(), // Material
+                tds[3].innerText.trim(), // Ubicación
+                tds[4].innerText.trim(), // Stock
+                tds[5].innerText.trim()  // Estado
+            ];
+        }
+        return null;
+    }).filter(Boolean); // Remover nulos
+
+    // 5. Validar que haya datos antes de generar el PDF
+    if (bodyData.length === 0) {
+        alert("No hay piezas en la tabla para exportar.");
+        return;
+    }
+
+    // 6. Generar la tabla con autoTable
+    doc.autoTable({
+        startY: 28,
+        head: [['Código', 'Nombre', 'Material', 'Ubicación', 'Stock', 'Estado']],
+        body: bodyData,
+        theme: 'striped',
+        headStyles: { fillColor: [234, 88, 12] }, // Cabecera Naranja
+        styles: { fontSize: 8, cellPadding: 2 }
+    });
+
+    // 7. Descargar el archivo
+    doc.save(`Inventario_Volmex_${Date.now()}.pdf`);
 }
 </script>
 </body>
