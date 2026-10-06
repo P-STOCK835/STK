@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -237,7 +237,7 @@
                                 <th class="p-2.5">Calibre</th>
                                 <th class="p-2.5 text-center">Stock</th>
                                 <th class="p-2.5">Estado</th>
-                                <th class="p-2.5">Plano</th>
+                                <th class="p-2.5">Archivo asociado</th>
                                 <th class="p-2.5">Acciones</th>
                             </tr>
                         </thead>
@@ -327,6 +327,33 @@
         </div>
     </section>
 </main>
+
+<!-- MODAL VISOR DE ARCHIVO -->
+<div id="modalArchivo" class="hidden fixed inset-0 bg-black/80 z-[60] p-4 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-full max-w-5xl p-4 shadow-2xl">
+            <div class="flex items-center justify-between gap-3 border-b pb-3 mb-3">
+                <div>
+                    <div class="font-bold text-lg">Archivo asociado a la pieza</div>
+                    <div id="visorArchivoNombre" class="text-xs text-slate-500 mt-1"></div>
+                </div>
+                <button onclick="cerrarVisorArchivo()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
+            </div>
+
+            <div id="visorArchivoContenedor" class="w-full h-[70vh] bg-slate-100 border rounded-xl overflow-hidden flex items-center justify-center">
+                <div id="visorArchivoCargando" class="text-slate-500 text-sm">Cargando archivo...</div>
+                <iframe id="visorArchivoPDF" class="w-full h-full hidden" title="Visor de PDF"></iframe>
+                <img id="visorArchivoIMG" class="max-w-full max-h-full object-contain hidden" alt="Archivo de pieza">
+                <div id="visorArchivoError" class="hidden text-center text-red-600 text-sm p-5"></div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mt-3">
+                <button id="btnAbrirArchivoPestana" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">↗ Abrir en nueva pestaña</button>
+                <button onclick="cerrarVisorArchivo()" class="bg-slate-200 hover:bg-slate-300 rounded-lg px-4 py-2 font-semibold ml-auto">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL ESCÁNER -->
 <div id="modalEscaner" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
@@ -461,6 +488,8 @@
     let piezas = [];
     let solicitudes = [];
     let escaner = null;
+    let escanerActivo = false;
+    let piezaDetalleActual = null;
     let previewObjectUrl = null;
     const $ = id => document.getElementById(id);
 
@@ -519,8 +548,12 @@
 
         // Subir nuevo archivo si se seleccionó uno
         if (archivoInput) {
-            const fileExt = archivoInput.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const fileExt = archivoInput.name.split('.').pop().toLowerCase();
+            const nombreOriginal = archivoInput.name;
+            const nombreSeguro = nombreOriginal
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9._-]+/g, '_');
+            const fileName = `${Date.now()}_${nombreSeguro}`;
             const filePath = `planos/${fileName}`;
             
             const { error: uploadError } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(filePath, archivoInput);
@@ -557,7 +590,8 @@
         try {
             if (id) {
                 // Actualizar
-                await supabaseClient.from('piezas').update(payload).eq('id', id);
+                const { error: updateError } = await supabaseClient.from('piezas').update(payload).eq('id', id);
+                if (updateError) throw updateError;
             } else {
                 // Insertar (aseguramos el código final aquí)
                 const cat = payload.categoria;
@@ -565,7 +599,8 @@
                 const conteo = piezas.filter(p => p.codigo && p.codigo.startsWith(cat + proc)).length + 1;
                 payload.codigo = `${cat}${proc}-P-${String(conteo).padStart(3, '0')}`;
                 
-                await supabaseClient.from('piezas').insert([payload]);
+                const { error: insertError } = await supabaseClient.from('piezas').insert([payload]);
+                if (insertError) throw insertError;
             }
             cancelarEdicion();
             await cargarPiezas();
@@ -595,22 +630,33 @@
             if (isCero) estadoHTML = `<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold">AGOTADO</span>`;
             else if (isBajoMin) estadoHTML = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold">BAJO</span>`;
 
-            let linkPlano = p.archivo_url ? `<a href="${p.archivo_url}" target="_blank" class="text-blue-600 hover:underline">Ver</a>` : `<span class="text-slate-400">N/A</span>`;
+            const hayArchivo = Boolean(p.archivo_url || p.archivo_path);
+            const nombreArchivo = hayArchivo ? escaparHTML(obtenerNombreArchivo(p)) : '';
+            const tipoArchivo = hayArchivo ? obtenerTipoArchivo(p) : '';
+            const archivoHTML = hayArchivo
+                ? `<div class="min-w-[210px]">
+                        <div class="font-semibold text-slate-700 truncate max-w-[210px]" title="${nombreArchivo}">${obtenerIconoArchivo(tipoArchivo)} ${nombreArchivo}</div>
+                        <div class="text-[10px] text-slate-500 mb-1">${tipoArchivo}</div>
+                        <button onclick="verArchivoPieza('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-md text-[11px] font-bold">👁️ Ver archivo</button>
+                    </div>`
+                : `<span class="text-slate-400">Sin archivo</span>`;
 
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50">
                     <td class="p-2.5">${index + 1}</td>
-                    <td class="p-2.5 font-mono font-bold text-orange-700">${p.codigo}</td>
-                    <td class="p-2.5 font-semibold">${p.nombre}</td>
-                    <td class="p-2.5">${p.material}</td>
-                    <td class="p-2.5">${p.calibre}</td>
+                    <td class="p-2.5 font-mono font-bold text-orange-700">${escaparHTML(p.codigo || '')}</td>
+                    <td class="p-2.5 font-semibold">${escaparHTML(p.nombre || '')}</td>
+                    <td class="p-2.5">${escaparHTML(p.material || '')}</td>
+                    <td class="p-2.5">${escaparHTML(p.calibre || '')}</td>
                     <td class="p-2.5 text-center font-bold ${isBajoMin ? 'text-red-600' : ''}">${p.stock_actual}</td>
                     <td class="p-2.5">${estadoHTML}</td>
-                    <td class="p-2.5">${linkPlano}</td>
-                    <td class="p-2.5 flex gap-1">
-                        <button onclick="abrirDetalle('${p.id}')" class="bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded">🔍</button>
-                        <button onclick="prepararEdicion('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">✏️</button>
-                        <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded">🗑️</button>
+                    <td class="p-2.5">${archivoHTML}</td>
+                    <td class="p-2.5">
+                        <div class="flex gap-1 items-center">
+                            <button onclick="abrirDetalle('${p.id}')" class="bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded" title="Ver detalle">🔍</button>
+                            <button onclick="prepararEdicion('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded" title="Editar">✏️</button>
+                            <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded" title="Eliminar">🗑️</button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -618,14 +664,14 @@
     }
 
     function aplicarFiltros() {
-        const txt = $('filtroNombre').value.toUpperCase();
+        const txt = $('filtroNombre').value.toUpperCase().trim();
         const mat = $('filtroMaterial').value;
         const cal = $('filtroCalibre').value;
         const cat = $('filtroCategoria').value;
         const est = $('filtroEstadoStock').value;
 
         const filtradas = piezas.filter(p => {
-            const matchTxt = p.nombre.includes(txt) || p.codigo.includes(txt);
+            const matchTxt = !txt || String(p.nombre || '').toUpperCase().includes(txt) || String(p.codigo || '').toUpperCase().includes(txt);
             const matchMat = mat ? p.material === mat : true;
             const matchCal = cal ? p.calibre === cal : true;
             const matchCat = cat ? p.categoria === cat : true;
@@ -702,8 +748,9 @@
         $('estadoEdicion').classList.remove('hidden');
         $('btnCancelarEdicion').classList.remove('hidden');$('btnGuardar').textContent = "💾 Actualizar pieza";
 
-        if(p.archivo_url) {
-            $('btnQuitarArchivoExistente').classList.remove('hidden');$('estadoArchivo').textContent = "Archivo actual en servidor";
+        if(p.archivo_url || p.archivo_path) {
+            $('btnQuitarArchivoExistente').classList.remove('hidden');
+            $('estadoArchivo').textContent = `Archivo: ${obtenerNombreArchivo(p)}`;
         } else {
             $('btnQuitarArchivoExistente').classList.add('hidden');
         }
@@ -727,13 +774,124 @@
     }
 
     // =========================
+    // ARCHIVOS - UTILIDADES Y VISOR
+    // =========================
+    function escaparHTML(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function obtenerNombreArchivo(p) {
+        if (!p) return 'Archivo';
+        if (p.archivo_nombre) return p.archivo_nombre;
+        const path = p.archivo_path || '';
+        const base = path.split('/').pop() || '';
+        // Archivos nuevos: 13-digitos_nombre-original.ext
+        const sinMarca = base.replace(/^\d{13}_/, '');
+        return sinMarca || base || 'Archivo asociado';
+    }
+
+    function obtenerTipoArchivo(p) {
+        if (p?.archivo_tipo) {
+            if (p.archivo_tipo === 'application/pdf') return 'PDF';
+            if (p.archivo_tipo.startsWith('image/')) return p.archivo_tipo.split('/')[1].toUpperCase();
+        }
+        const nombre = obtenerNombreArchivo(p).toLowerCase();
+        const ext = nombre.includes('.') ? nombre.split('.').pop().toUpperCase() : '';
+        return ext || 'ARCHIVO';
+    }
+
+    function obtenerIconoArchivo(tipo) {
+        if (tipo === 'PDF') return '📄';
+        if (['JPG','JPEG','PNG','WEBP'].includes(tipo)) return '🖼️';
+        return '📎';
+    }
+
+    async function obtenerUrlArchivo(p) {
+        if (!p) return null;
+
+        // Primero intentamos URL firmada a partir del path: funciona también con bucket privado.
+        if (p.archivo_path) {
+            const { data, error } = await supabaseClient.storage
+                .from(SUPABASE_BUCKET)
+                .createSignedUrl(p.archivo_path, 3600);
+            if (!error && data?.signedUrl) return data.signedUrl;
+        }
+
+        // Compatibilidad con registros antiguos que solo tengan la URL pública.
+        return p.archivo_url || null;
+    }
+
+    async function verArchivoPieza(id) {
+        const p = piezas.find(x => x.id === id);
+        if (!p || (!p.archivo_url && !p.archivo_path)) {
+            alert('Esta pieza no tiene un archivo asociado.');
+            return;
+        }
+
+        $('modalArchivo').classList.remove('hidden');
+        $('visorArchivoNombre').textContent = `${p.codigo} · ${obtenerNombreArchivo(p)}`;
+        $('visorArchivoCargando').classList.remove('hidden');
+        $('visorArchivoPDF').classList.add('hidden');
+        $('visorArchivoIMG').classList.add('hidden');
+        $('visorArchivoError').classList.add('hidden');
+        $('visorArchivoPDF').src = '';
+        $('visorArchivoIMG').src = '';
+        $('btnAbrirArchivoPestana').onclick = () => abrirArchivoNuevaPestana(id);
+
+        try {
+            const url = await obtenerUrlArchivo(p);
+            if (!url) throw new Error('No se pudo obtener la URL del archivo.');
+
+            $('visorArchivoCargando').classList.add('hidden');
+            const tipo = obtenerTipoArchivo(p);
+            if (tipo === 'PDF') {
+                $('visorArchivoPDF').src = url;
+                $('visorArchivoPDF').classList.remove('hidden');
+            } else {
+                $('visorArchivoIMG').src = url;
+                $('visorArchivoIMG').classList.remove('hidden');
+            }
+            $('btnAbrirArchivoPestana').onclick = () => window.open(url, '_blank', 'noopener');
+        } catch (error) {
+            console.error(error);
+            $('visorArchivoCargando').classList.add('hidden');
+            $('visorArchivoError').textContent = 'No fue posible cargar el archivo. Verifica que el objeto exista en el bucket "planos" y que las políticas de Storage permitan lectura.';
+            $('visorArchivoError').classList.remove('hidden');
+        }
+    }
+
+    async function abrirArchivoNuevaPestana(id) {
+        const p = piezas.find(x => x.id === id);
+        if (!p) return;
+        try {
+            const url = await obtenerUrlArchivo(p);
+            if (!url) return alert('No existe un archivo asociado.');
+            window.open(url, '_blank', 'noopener');
+        } catch (error) {
+            console.error(error);
+            alert('No fue posible abrir el archivo.');
+        }
+    }
+
+    function cerrarVisorArchivo() {
+        $('modalArchivo').classList.add('hidden');
+        $('visorArchivoPDF').src = '';
+        $('visorArchivoIMG').src = '';
+    }
+
+    // =========================
     // VISOR DE ARCHIVOS
     // =========================
     function previsualizarArchivo(e) {
         const file = e.target.files[0];
         if(!file) return limpiarArchivoSeleccionado();
         
-        $('estadoArchivo').textContent = file.name;
+        $('estadoArchivo').textContent = `Seleccionado: ${file.name}`;
         $('quitarArchivo').value = "0";
         $('btnQuitarArchivoExistente').classList.add('hidden');
 
@@ -901,14 +1059,25 @@
             displayValue: true
         });
 
-        // Visor PDF
-        if (p.archivo_url) {
+        // Archivo asociado
+        if (p.archivo_url || p.archivo_path) {
+            const nombreArchivo = escaparHTML(obtenerNombreArchivo(p));
+            const tipoArchivo = obtenerTipoArchivo(p);
             $('detalleArchivo').innerHTML = `
-                <div class="font-bold text-sm mb-2">Plano adjunto</div>
-                <a href="${p.archivo_url}" target="_blank" class="bg-blue-50 text-blue-700 px-3 py-2 rounded font-semibold text-sm inline-block mb-3">Abrir archivo completo</a>
+                <div class="font-bold text-sm mb-2">Archivo asociado</div>
+                <div class="bg-slate-50 border rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <div class="font-semibold text-slate-800">${obtenerIconoArchivo(tipoArchivo)} ${nombreArchivo}</div>
+                        <div class="text-xs text-slate-500 mt-1">Tipo: ${tipoArchivo}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="verArchivoPieza('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-sm">👁️ Ver archivo</button>
+                        <button onclick="abrirArchivoNuevaPestana('${p.id}')" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-lg font-semibold text-sm">↗ Nueva pestaña</button>
+                    </div>
+                </div>
             `;
         } else {
-            $('detalleArchivo').innerHTML = `<div class="text-slate-500 text-sm">No hay plano asociado.</div>`;
+            $('detalleArchivo').innerHTML = `<div class="text-slate-500 text-sm">No hay archivo asociado a esta pieza.</div>`;
         }
 
         // Acciones botones
