@@ -102,7 +102,7 @@
 
                     <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
                         <div class="text-xs font-semibold text-orange-700">Código de pieza</div>
-                        <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VSD-P-001</div>
+                        <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VD-P-001</div>
                         <div id="ayudaCodigo" class="text-[11px] text-orange-700 mt-1">Se asigna automáticamente.</div>
                     </div>
 
@@ -170,21 +170,11 @@
                             <iframe id="pdfVisor" class="w-full h-full hidden" title="Vista previa PDF"></iframe>
                             <img id="imgVisor" class="max-h-full max-w-full object-contain hidden" alt="Vista previa de pieza">
                         </div>
-                        <div id="progresoArchivo" class="hidden mt-2">
-                            <div class="flex justify-between text-[11px] mb-1">
-                                <span>Subiendo archivo...</span><span id="textoProgreso">0%</span>
-                            </div>
-                            <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div id="barraProgreso" class="h-full bg-orange-500 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
                     </div>
 
                     <input type="hidden" id="editDocId" value="">
                     <input type="hidden" id="archivoUrlActual" value="">
                     <input type="hidden" id="archivoPathActual" value="">
-                    <input type="hidden" id="archivoNombreActual" value="">
-                    <input type="hidden" id="archivoTipoActual" value="">
                     <input type="hidden" id="quitarArchivo" value="0">
 
                     <div class="flex gap-2">
@@ -212,7 +202,7 @@
 
                 <!-- FILTROS -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
-                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre..."
+                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre o código..."
                            class="border rounded-lg p-2.5 text-sm">
                     <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
                         <option value="">Todos los materiales</option>
@@ -418,7 +408,6 @@
             <div class="flex flex-wrap gap-2">
                 <button id="btnDetalleEditar" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">✏️ Editar</button>
                 <button id="btnDetalleSolicitud" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg px-4 py-2 font-semibold">📝 Solicitar piezas</button>
-                <button id="btnDetallePDF" class="bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-4 py-2 font-semibold">📄 PDF</button>
                 <button onclick="cerrarDetalle()" class="bg-slate-200 hover:bg-slate-300 rounded-lg px-4 py-2 font-semibold ml-auto">Cerrar</button>
             </div>
         </div>
@@ -429,1276 +418,616 @@
     // ============================================================
     // SUPABASE - CONFIGURACIÓN
     // ============================================================
-    // Crea tu proyecto en https://supabase.com/ y coloca aquí:
-    // 1) Project URL
-    // 2) Publishable/anon key
-    // Nunca pongas la service_role key en este HTML.
-
-    const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
-    const SUPABASE_ANON_KEY = "TU-PUBLISHABLE-ANON-KEY";
+    // Sustituye con tus credenciales reales
+    const SUPABASE_URL = "https://bnnixbgctotrptoxjxhw.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJubml4YmdjdG90cnB0b3hqeGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTgyNTksImV4cCI6MjEwNjgzNDI1OX0.MPlrkcRRr2sLs5Jwc3GzqttIAtHUZCxJaIf5qIFToB8";
     const SUPABASE_BUCKET = "planos";
 
     const { createClient } = window.supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    window.supabaseClient = supabaseClient;
-    window.supabaseDB = supabaseClient;
-    window.supabaseStorage = supabaseClient.storage;
-
-    // Capa pequeña de compatibilidad para que la lógica de la interfaz
-    // conserve una estructura sencilla mientras todo se ejecuta en Supabase.
-    window.supabaseList = {
-        collection(_db, table) {
-            return { table };
-        },
-        async getDocs(collectionRef) {
-            const { data, error } = await supabaseClient
-                .from(collectionRef.table)
-                .select("*");
-            if (error) throw error;
-            return {
-                empty: !data || data.length === 0,
-                docs: (data || []).map(row => ({
-                    id: row.id,
-                    data: () => row
-                }))
-            };
-        },
-        doc(_db, table, id) {
-            return { table, id };
-        },
-        async addDoc(collectionRef, payload) {
-            const { data, error } = await supabaseClient
-                .from(collectionRef.table)
-                .insert(payload)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
-        },
-        async updateDoc(docRef, payload) {
-            const { error } = await supabaseClient
-                .from(docRef.table)
-                .update(payload)
-                .eq("id", docRef.id);
-            if (error) throw error;
-        },
-        async deleteDoc(docRef) {
-            const { error } = await supabaseClient
-                .from(docRef.table)
-                .delete()
-                .eq("id", docRef.id);
-            if (error) throw error;
-        },
-        ref(_storage, path) {
-            return { path };
-        },
-        async uploadBytes(storageRef, file, options = {}) {
-            const { data, error } = await supabaseClient.storage
-                .from(SUPABASE_BUCKET)
-                .upload(storageRef.path, file, {
-                    contentType: options.contentType || file.type || "application/octet-stream",
-                    upsert: false
-                });
-            if (error) throw error;
-            return data;
-        },
-        async getDownloadURL(storageRef) {
-            const { data } = supabaseClient.storage
-                .from(SUPABASE_BUCKET)
-                .getPublicUrl(storageRef.path);
-            if (!data?.publicUrl) throw new Error("No se pudo obtener la URL pública del archivo.");
-            return data.publicUrl;
-        },
-        async deleteObject(storageRef) {
-            const { error } = await supabaseClient.storage
-                .from(SUPABASE_BUCKET)
-                .remove([storageRef.path]);
-            if (error) throw error;
-        },
-        serverTimestamp() {
-            return new Date().toISOString();
-        }
-    };
+    window.supabaseReady = false;
 
     async function inicializarSupabase() {
         try {
-            if (SUPABASE_URL.includes("TU-PROYECTO") || SUPABASE_ANON_KEY.includes("TU-PUBLISHABLE")) {
-                throw new Error("Faltan SUPABASE_URL y SUPABASE_ANON_KEY. Sustitúyelos en el código.");
+            if (SUPABASE_URL.includes("TU-PROYECTO")) {
+                throw new Error("Faltan credenciales de Supabase en el código.");
             }
-
-            // Prueba real de conexión/consulta.
+            // Prueba de conexión
             const { error } = await supabaseClient.from("piezas").select("id", { head: true, count: "exact" });
             if (error) throw error;
 
             window.supabaseReady = true;
-            const estado = document.getElementById("estadoConexion");
-            if (estado) {
-                estado.textContent = "Supabase conectado";
-                estado.className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
-            }
+            document.getElementById("estadoConexion").textContent = "Supabase conectado";
+            document.getElementById("estadoConexion").className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
+            
             await cargarTodo();
         } catch (error) {
-            console.error("Supabase:", error);
+            console.error("Supabase Error:", error);
             window.supabaseReady = false;
-            const tbody = document.getElementById("tablaPiezasBody");
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-red-600 font-semibold">
-                    No se pudo conectar con Supabase. Revisa SUPABASE_URL, la clave publishable/anon,
-                    las tablas y las políticas RLS. Error: ${escapeHtml(error.message || error)}
-                </td></tr>`;
-            }
-            const estado = document.getElementById("estadoConexion");
-            if (estado) {
-                estado.textContent = "Supabase sin conexión";
-                estado.className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
-            }
-            const msg = document.getElementById("mensajeEscaner");
-            if (msg) msg.textContent = "Supabase no está conectado; el escaneo de cámara funciona, pero no podrá localizar piezas hasta corregir la conexión.";
+            document.getElementById("tablaPiezasBody").innerHTML = `<tr><td colspan="9" class="p-5 text-center text-red-600 font-semibold">
+                No se pudo conectar con Supabase. Revisa tus credenciales o las tablas creadas. Error: ${error.message}
+            </td></tr>`;
+            document.getElementById("estadoConexion").textContent = "Supabase sin conexión";
+            document.getElementById("estadoConexion").className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
         }
     }
 
     window.addEventListener("DOMContentLoaded", inicializarSupabase);
-</script>
 
-<script>
     // =========================
-    // ESTADO LOCAL
+    // ESTADO LOCAL Y VARIABLES
     // =========================
     let piezas = [];
     let solicitudes = [];
     let escaner = null;
-    let escanerActivo = false;
-    let piezaDetalleActual = null;
     let previewObjectUrl = null;
-
     const $ = id => document.getElementById(id);
 
-    // =========================
-    // UTILIDADES
-    // =========================
-    function escapeHtml(value = "") {
-        return String(value)
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
-    }
-
-    function normalizar(value = "") {
-        return String(value).trim().toUpperCase();
-    }
-
-    function fechaTexto(timestamp) {
-        if (!timestamp) return "—";
-        let fecha = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
-        if (Number.isNaN(fecha.getTime())) return "—";
-        return fecha.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
-    }
-
-    function estadoStock(pieza) {
-        const stock = Number(pieza.stockActual || 0);
-        const min = Number(pieza.stockMin || 0);
-        if (stock === 0) return { texto: "SIN STOCK", clase: "bg-red-100 text-red-700" };
-        if (stock <= min) return { texto: "BAJO MÍNIMO", clase: "bg-amber-100 text-amber-700" };
-        return { texto: "OK", clase: "bg-emerald-100 text-emerald-700" };
-    }
-
     function mostrarSeccion(seccion) {
-        $("seccionInventario").classList.toggle("hidden", seccion !== "inventario");
-        $("seccionSolicitudes").classList.toggle("hidden", seccion !== "solicitudes");
-        if (seccion === "solicitudes") {
-            cargarSolicitudes();
-        }
+        $('seccionInventario').classList.add('hidden');
+        $('seccionSolicitudes').classList.add('hidden');
+        
+        if (seccion === 'inventario') $('seccionInventario').classList.remove('hidden');
+        if (seccion === 'solicitudes') $('seccionSolicitudes').classList.remove('hidden');
     }
 
-    function actualizarCodigoVistaPrevia() {
-        const cat = $("categoria").value;
-        const proc = $("proceso").value;
-        const editando = !!$("editDocId").value;
-        $("codigoGeneradoVista").textContent = editando
-            ? (piezaDetalleActual?.codigoPieza || `${cat}S${proc}-P-001`)
-            : `${cat}S${proc}-P-###`;
+    function fechaTexto(dateString) {
+        if (!dateString) return "—";
+        const d = new Date(dateString);
+        return isNaN(d.getTime()) ? "—" : d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
     }
 
     // =========================
-    // SUPABASE: CARGAR DATOS
+    // LÓGICA DE PIEZAS
     // =========================
     async function cargarTodo() {
         await cargarPiezas();
         await cargarSolicitudes();
+        actualizarSelectPiezas();
+        actualizarSelectFiltros();
     }
 
     async function cargarPiezas() {
         if (!window.supabaseReady) return;
-
-        const snap = await window.supabaseList.getDocs(
-            window.supabaseList.collection(window.supabaseDB, "piezas")
-        );
-
-        piezas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        piezas.sort((a, b) => {
-            const na = Number(a.consecutivoNumero || 0);
-            const nb = Number(b.consecutivoNumero || 0);
-            return nb - na;
-        });
-
-        actualizarFiltros();
-        llenarSelectPiezasSolicitud();
+        const { data, error } = await supabaseClient.from('piezas').select('*').order('created_at', { ascending: false });
+        if (error) return console.error(error);
+        piezas = data || [];
         actualizarEstadisticas();
         aplicarFiltros();
+        actualizarCodigoVistaPrevia();
     }
 
-    async function cargarSolicitudes() {
-        if (!window.supabaseReady) return;
+    function actualizarCodigoVistaPrevia() {
+        if ($('editDocId').value) return; // Si estamos editando, mantenemos el código actual
+        const cat = $('categoria').value;
+        const proc = $('proceso').value;
+        const conteo = piezas.filter(p => p.codigo && p.codigo.startsWith(cat + proc)).length + 1;
+        $('codigoGeneradoVista').textContent = `${cat}${proc}-P-${String(conteo).padStart(3, '0')}`;
+    }
 
-        const snap = await window.supabaseList.getDocs(
-            window.supabaseList.collection(window.supabaseDB, "solicitudesPiezas")
-        );
+    async function guardarPieza(e) {
+        e.preventDefault();
+        if (!window.supabaseReady) return alert("No hay conexión con Supabase.");
 
-        solicitudes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        solicitudes.sort((a, b) => {
-            const ta = a.fechaSolicitud?.toMillis ? a.fechaSolicitud.toMillis() : 0;
-            const tb = b.fechaSolicitud?.toMillis ? b.fechaSolicitud.toMillis() : 0;
-            return tb - ta;
+        const id = $('editDocId').value;
+        let codigo = $('codigoGeneradoVista').textContent;
+        const archivoInput = $('archivoPlano').files[0];
+        
+        let archivo_url = $('archivoUrlActual').value;
+        let archivo_path = $('archivoPathActual').value;
+
+        // Subir nuevo archivo si se seleccionó uno
+        if (archivoInput) {
+            const fileExt = archivoInput.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `planos/${fileName}`;
+            
+            const { error: uploadError } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(filePath, archivoInput);
+            if (uploadError) return alert("Error al subir archivo: " + uploadError.message);
+            
+            const { data: publicUrlData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(filePath);
+            
+            // Si hay un archivo anterior y lo estamos reemplazando, eliminar el viejo (opcional, pero buena práctica)
+            if (archivo_path) await supabaseClient.storage.from(SUPABASE_BUCKET).remove([archivo_path]);
+
+            archivo_url = publicUrlData.publicUrl;
+            archivo_path = filePath;
+        } else if ($('quitarArchivo').value === "1" && archivo_path) {
+            // Eliminar archivo si el usuario pulsó "Quitar archivo guardado"
+            await supabaseClient.storage.from(SUPABASE_BUCKET).remove([archivo_path]);
+            archivo_url = "";
+            archivo_path = "";
+        }
+
+        const payload = {
+            categoria: $('categoria').value,
+            proceso: $('proceso').value,
+            nombre: $('nombre').value.toUpperCase(),
+            material: $('material').value.toUpperCase(),
+            calibre: $('calibre').value.toUpperCase(),
+            aplicacion: $('aplicacion').value,
+            stock_actual: parseInt($('stockActual').value),
+            stock_min: parseInt($('stockMin').value),
+            stock_max: parseInt($('stockMax').value),
+            archivo_url: archivo_url,
+            archivo_path: archivo_path
+        };
+
+        try {
+            if (id) {
+                // Actualizar
+                await supabaseClient.from('piezas').update(payload).eq('id', id);
+            } else {
+                // Insertar (aseguramos el código final aquí)
+                const cat = payload.categoria;
+                const proc = payload.proceso;
+                const conteo = piezas.filter(p => p.codigo && p.codigo.startsWith(cat + proc)).length + 1;
+                payload.codigo = `${cat}${proc}-P-${String(conteo).padStart(3, '0')}`;
+                
+                await supabaseClient.from('piezas').insert([payload]);
+            }
+            cancelarEdicion();
+            await cargarPiezas();
+            alert("Pieza guardada exitosamente.");
+        } catch (error) {
+            console.error("Error al guardar:", error);
+            alert("Hubo un error al guardar la pieza.");
+        }
+    }
+
+    function renderPiezas(datos) {
+        const tbody = $('tablaPiezasBody');
+        tbody.innerHTML = '';
+        if(datos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-slate-500">No se encontraron piezas.</td></tr>`;
+            $('textoResultados').textContent = "0 resultados";
+            return;
+        }
+        
+        $('textoResultados').textContent = `${datos.length} resultado(s)`;
+
+        datos.forEach((p, index) => {
+            const isBajoMin = p.stock_actual < p.stock_min;
+            const isCero = p.stock_actual === 0;
+            
+            let estadoHTML = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">OK</span>`;
+            if (isCero) estadoHTML = `<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold">AGOTADO</span>`;
+            else if (isBajoMin) estadoHTML = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold">BAJO</span>`;
+
+            let linkPlano = p.archivo_url ? `<a href="${p.archivo_url}" target="_blank" class="text-blue-600 hover:underline">Ver</a>` : `<span class="text-slate-400">N/A</span>`;
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5">${index + 1}</td>
+                    <td class="p-2.5 font-mono font-bold text-orange-700">${p.codigo}</td>
+                    <td class="p-2.5 font-semibold">${p.nombre}</td>
+                    <td class="p-2.5">${p.material}</td>
+                    <td class="p-2.5">${p.calibre}</td>
+                    <td class="p-2.5 text-center font-bold ${isBajoMin ? 'text-red-600' : ''}">${p.stock_actual}</td>
+                    <td class="p-2.5">${estadoHTML}</td>
+                    <td class="p-2.5">${linkPlano}</td>
+                    <td class="p-2.5 flex gap-1">
+                        <button onclick="abrirDetalle('${p.id}')" class="bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded">🔍</button>
+                        <button onclick="prepararEdicion('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">✏️</button>
+                        <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded">🗑️</button>
+                    </td>
+                </tr>
+            `;
         });
-
-        actualizarEstadisticas();
-        renderSolicitudes();
-    }
-
-    // =========================
-    // FILTROS
-    // =========================
-    function actualizarFiltros() {
-        llenarOpciones("filtroMaterial", [...new Set(piezas.map(p => normalizar(p.material)).filter(Boolean))]);
-        llenarOpciones("filtroCalibre", [...new Set(piezas.map(p => String(p.calibre || "").trim()).filter(Boolean))]);
-        llenarOpciones("filtroCategoria", [...new Set(piezas.map(p => p.categoria).filter(Boolean))], {
-            V: "Volteo", L: "Lowboy", G: "Góndola", X: "Genérico"
-        });
-    }
-
-    function llenarOpciones(id, valores, nombres = {}) {
-        const select = $(id);
-        const actual = select.value;
-        const primera = select.options[0]?.textContent || "Todos";
-        select.innerHTML = `<option value="">${primera}</option>`;
-
-        valores.sort((a, b) => String(a).localeCompare(String(b), "es"))
-            .forEach(v => {
-                const option = document.createElement("option");
-                option.value = v;
-                option.textContent = nombres[v] || v;
-                select.appendChild(option);
-            });
-
-        if (valores.includes(actual)) select.value = actual;
     }
 
     function aplicarFiltros() {
-        const nombre = normalizar($("filtroNombre").value);
-        const material = normalizar($("filtroMaterial").value);
-        const calibre = String($("filtroCalibre").value || "").trim();
-        const categoria = $("filtroCategoria").value;
-        const estado = $("filtroEstadoStock").value;
+        const txt = $('filtroNombre').value.toUpperCase();
+        const mat = $('filtroMaterial').value;
+        const cal = $('filtroCalibre').value;
+        const cat = $('filtroCategoria').value;
+        const est = $('filtroEstadoStock').value;
 
         const filtradas = piezas.filter(p => {
-            const coincideNombre = !nombre ||
-                normalizar(p.nombre).includes(nombre) ||
-                normalizar(p.codigoPieza).includes(nombre);
+            const matchTxt = p.nombre.includes(txt) || p.codigo.includes(txt);
+            const matchMat = mat ? p.material === mat : true;
+            const matchCal = cal ? p.calibre === cal : true;
+            const matchCat = cat ? p.categoria === cat : true;
+            
+            let matchEst = true;
+            if (est === 'BAJO') matchEst = p.stock_actual > 0 && p.stock_actual < p.stock_min;
+            if (est === 'CERO') matchEst = p.stock_actual === 0;
+            if (est === 'OK') matchEst = p.stock_actual >= p.stock_min;
 
-            const coincideMaterial = !material || normalizar(p.material) === material;
-            const coincideCalibre = !calibre || String(p.calibre || "").trim() === calibre;
-            const coincideCategoria = !categoria || p.categoria === categoria;
-
-            const bajo = Number(p.stockActual || 0) <= Number(p.stockMin || 0);
-            const cero = Number(p.stockActual || 0) === 0;
-            const coincideEstado =
-                !estado ||
-                (estado === "BAJO" && bajo) ||
-                (estado === "OK" && !bajo) ||
-                (estado === "CERO" && cero);
-
-            return coincideNombre && coincideMaterial && coincideCalibre && coincideCategoria && coincideEstado;
+            return matchTxt && matchMat && matchCal && matchCat && matchEst;
         });
 
-        renderTablaPiezas(filtradas);
-        $("textoResultados").textContent = `${filtradas.length} resultado(s) de ${piezas.length}`;
+        renderPiezas(filtradas);
     }
 
     function limpiarFiltros() {
-        $("filtroNombre").value = "";
-        $("filtroMaterial").value = "";
-        $("filtroCalibre").value = "";
-        $("filtroCategoria").value = "";
-        $("filtroEstadoStock").value = "";
+        $('filtroNombre').value = '';
+        $('filtroMaterial').value = '';$('filtroCalibre').value = '';
+        $('filtroCategoria').value = '';$('filtroEstadoStock').value = '';
         aplicarFiltros();
     }
 
-    // =========================
-    // TABLA INVENTARIO
-    // =========================
-    function renderTablaPiezas(lista) {
-        const tbody = $("tablaPiezasBody");
+    function actualizarSelectFiltros() {
+        const materiales = [...new Set(piezas.map(p => p.material))].filter(Boolean);
+        const calibres = [...new Set(piezas.map(p => p.calibre))].filter(Boolean);
 
-        if (!lista.length) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">No hay piezas que coincidan con el filtro.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = lista.map(p => {
-            const estado = estadoStock(p);
-            return `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-2.5 font-semibold">${escapeHtml(p.numero || "—")}</td>
-                    <td class="p-2.5 font-mono font-bold text-orange-700">${escapeHtml(p.codigoPieza || "—")}</td>
-                    <td class="p-2.5">
-                        <button onclick="verDetalle('${p.id}')" class="text-left font-semibold hover:text-orange-700 hover:underline">
-                            ${escapeHtml(p.nombre || "SIN NOMBRE")}
-                        </button>
-                    </td>
-                    <td class="p-2.5">${escapeHtml(p.material || "—")}</td>
-                    <td class="p-2.5">${escapeHtml(p.calibre || "—")}</td>
-                    <td class="p-2.5 text-center font-bold">${Number(p.stockActual || 0)}</td>
-                    <td class="p-2.5">
-                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${estado.clase}">
-                            ${estado.texto}
-                        </span>
-                    </td>
-                    <td class="p-2.5">
-                        ${p.archivoUrl
-                            ? `<a href="${escapeHtml(p.archivoUrl)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline font-semibold">Ver</a>`
-                            : `<span class="text-slate-400">—</span>`}
-                    </td>
-                    <td class="p-2.5">
-                        <div class="flex flex-wrap gap-1">
-                            <button onclick="editarPieza('${p.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold">✏️</button>
-                            <button onclick="solicitarDesdeTabla('${p.id}')" class="bg-orange-50 hover:bg-orange-100 text-orange-700 px-2 py-1 rounded font-semibold">📝</button>
-                            <button onclick="descargarPiezaPDF('${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded font-semibold">📄</button>
-                            <button onclick="eliminarPieza('${p.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
-        }).join("");
+        $('filtroMaterial').innerHTML = '<option value="">Todos los materiales</option>' + materiales.map(m => `<option value="${m}">${m}</option>`).join('');
+        $('filtroCalibre').innerHTML = '<option value="">Todos los calibres</option>' + calibres.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-    // =========================
-    // FORMULARIO PIEZA
-    // =========================
-    async function guardarPieza(e) {
-        e.preventDefault();
+    function actualizarEstadisticas() {
+        $('statPiezas').textContent = piezas.length;
+        $('statUnidades').textContent = piezas.reduce((acc, p) => acc + p.stock_actual, 0);$('statBajoMin').textContent = piezas.filter(p => p.stock_actual < p.stock_min).length;
+    }
 
-        if (!window.supabaseReady) {
-            alert("Supabase no está listo. Revisa la autenticación anónima y las reglas.");
-            return;
-        }
-
-        const btn = $("btnGuardar");
-        btn.disabled = true;
-        btn.textContent = $("editDocId").value ? "Actualizando..." : "Guardando...";
-
+    async function eliminarPieza(id) {
+        if(!confirm("¿Estás seguro de eliminar esta pieza?")) return;
+        const pieza = piezas.find(p => p.id === id);
+        
         try {
-            const editId = $("editDocId").value.trim();
-            const cat = $("categoria").value;
-            const proc = $("proceso").value;
-
-            const nombre = normalizar($("nombre").value);
-            const material = normalizar($("material").value);
-            const calibre = $("calibre").value.trim();
-            const aplicacion = $("aplicacion").value.trim();
-
-            const stockActual = Math.max(0, parseInt($("stockActual").value, 10) || 0);
-            const stockMin = Math.max(0, parseInt($("stockMin").value, 10) || 0);
-            const stockMax = Math.max(1, parseInt($("stockMax").value, 10) || 1);
-
-            if (stockMax < stockMin) {
-                throw new Error("El stock máximo no puede ser menor al stock mínimo.");
+            // Eliminar archivo de storage si existe
+            if(pieza && pieza.archivo_path) {
+                await supabaseClient.storage.from(SUPABASE_BUCKET).remove([pieza.archivo_path]);
             }
-
-            // ---- Archivo nuevo ----
-            let archivoUrl = $("archivoUrlActual").value || "";
-            let archivoPath = $("archivoPathActual").value || "";
-            let archivoNombre = $("archivoNombreActual").value || "";
-            let archivoTipo = $("archivoTipoActual").value || "";
-
-            const inputArchivo = $("archivoPlano");
-            const nuevoArchivo = inputArchivo.files?.[0] || null;
-            const quitarArchivo = $("quitarArchivo").value === "1";
-
-            if (nuevoArchivo) {
-                validarArchivo(nuevoArchivo);
-
-                const extension = nuevoArchivo.name.split(".").pop().toLowerCase();
-                const nombreSeguro = nuevoArchivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-                const pathNuevo = `planos/${crypto.randomUUID()}_${nombreSeguro}`;
-
-                mostrarProgresoArchivo(true, 10, "Subiendo...");
-                const storageRef = window.supabaseList.ref(window.supabaseStorage, pathNuevo);
-                await window.supabaseList.uploadBytes(storageRef, nuevoArchivo, {
-                    contentType: nuevoArchivo.type || (extension === "pdf" ? "application/pdf" : "image/*")
-                });
-                mostrarProgresoArchivo(true, 80, "Obteniendo enlace...");
-                archivoUrl = await window.supabaseList.getDownloadURL(storageRef);
-                archivoPath = pathNuevo;
-                archivoNombre = nuevoArchivo.name;
-                archivoTipo = nuevoArchivo.type || "";
-                mostrarProgresoArchivo(true, 100, "Listo");
-            } else if (quitarArchivo) {
-                archivoUrl = "";
-                archivoPath = "";
-                archivoNombre = "";
-                archivoTipo = "";
-            }
-
-            if (editId) {
-                const piezaRef = window.supabaseList.doc(window.supabaseDB, "piezas", editId);
-                await window.supabaseList.updateDoc(piezaRef, {
-                    categoria: cat,
-                    procesoLetra: proc,
-                    nombre,
-                    material,
-                    calibre,
-                    aplicacion,
-                    stockActual,
-                    stockMin,
-                    stockMax,
-                    puntoReorden: stockActual <= stockMin ? "SI" : "NO",
-                    archivoUrl,
-                    archivoPath,
-                    archivoNombre,
-                    archivoTipo,
-                    fechaActualizacion: window.supabaseList.serverTimestamp()
-                });
-
-                // Borra el archivo anterior únicamente después de guardar correctamente el nuevo.
-                const rutaAnterior = piezaDetalleActual?.archivoPath || $("archivoPathActual").dataset.oldPath || "";
-                if (nuevoArchivo && rutaAnterior && rutaAnterior !== archivoPath) {
-                    try {
-                        await window.supabaseList.deleteObject(
-                            window.supabaseList.ref(window.supabaseStorage, rutaAnterior)
-                        );
-                    } catch (err) {
-                        console.warn("No se pudo borrar el archivo anterior:", err);
-                    }
-                }
-
-                if (quitarArchivo && !nuevoArchivo && rutaAnterior) {
-                    try {
-                        await window.supabaseList.deleteObject(
-                            window.supabaseList.ref(window.supabaseStorage, rutaAnterior)
-                        );
-                    } catch (err) {
-                        console.warn("No se pudo borrar el archivo anterior:", err);
-                    }
-                }
-
-                alert(`Pieza ${piezaDetalleActual?.codigoPieza || ""} actualizada correctamente.`);
-            } else {
-                // Consecutivo seguro por categoría + proceso mediante función RPC de PostgreSQL.
-                const { data: numConsecutivo, error: errorConsecutivo } = await window.supabaseClient
-                    .rpc("siguiente_consecutivo", {
-                        p_categoria: cat,
-                        p_proceso: proc
-                    });
-                if (errorConsecutivo) throw errorConsecutivo;
-
-                const numFormateado = `P-${String(numConsecutivo).padStart(3, "0")}`;
-                const codigoPieza = `${cat}S${proc}-${numFormateado}`;
-
-                await window.supabaseList.addDoc(
-                    window.supabaseList.collection(window.supabaseDB, "piezas"),
-                    {
-                        numero: numFormateado,
-                        codigoPieza,
-                        categoria: cat,
-                        procesoLetra: proc,
-                        consecutivoNumero: numConsecutivo,
-                        nombre,
-                        material,
-                        calibre,
-                        aplicacion,
-                        stockActual,
-                        stockMin,
-                        stockMax,
-                        puntoReorden: stockActual <= stockMin ? "SI" : "NO",
-                        archivoUrl,
-                        archivoPath,
-                        archivoNombre,
-                        archivoTipo,
-                        fechaRegistro: window.supabaseList.serverTimestamp()
-                    }
-                );
-
-                alert(`Pieza registrada correctamente: ${codigoPieza}`);
-            }
-
-            resetFormulario();
+            await supabaseClient.from('piezas').delete().eq('id', id);
             await cargarPiezas();
-
         } catch (error) {
-            console.error("Error al guardar:", error);
-
-            let mensaje = error?.message || "Error desconocido.";
-            if (mensaje.includes("storage/unauthorized")) {
-                mensaje = "Supabase Storage rechazó el archivo. Revisa las reglas de Storage y que Authentication > Anonymous esté activa.";
-            } else if (mensaje.includes("storage/unknown")) {
-                mensaje = "Supabase Storage no pudo completar la carga. Revisa el bucket y la conexión.";
-            } else if (mensaje.includes("permission-denied")) {
-                mensaje = "base de datos de Supabase rechazó la operación. Revisa las reglas de base de datos de Supabase y la autenticación.";
-            }
-
-            alert("No se pudo guardar: " + mensaje);
-
-        } finally {
-            btn.disabled = false;
-            btn.textContent = $("editDocId").value ? "💾 Actualizar pieza" : "💾 Guardar pieza";
-            setTimeout(() => mostrarProgresoArchivo(false), 500);
+            console.error("Error al eliminar", error);
+            alert("No se pudo eliminar.");
         }
     }
 
-    function validarArchivo(file) {
-        const tipos = ["application/pdf", "image/jpeg", "image/png"];
-        const extensiones = [".pdf", ".jpg", ".jpeg", ".png"];
-        const nombre = file.name.toLowerCase();
+    function prepararEdicion(id) {
+        const p = piezas.find(x => x.id === id);
+        if(!p) return;
+        
+        $('editDocId').value = p.id;
+        $('categoria').value = p.categoria || "V";
+        $('proceso').value = p.proceso || "D";
+        $('nombre').value = p.nombre;
+        $('material').value = p.material;
+        $('calibre').value = p.calibre;
+        $('aplicacion').value = p.aplicacion;
+        $('stockActual').value = p.stock_actual;
+        $('stockMin').value = p.stock_min;
+        $('stockMax').value = p.stock_max;
+        $('codigoGeneradoVista').textContent = p.codigo;
+        
+        $('archivoUrlActual').value = p.archivo_url || "";
+        $('archivoPathActual').value = p.archivo_path || "";
+        $('quitarArchivo').value = "0";
 
-        if (!tipos.includes(file.type) && !extensiones.some(ext => nombre.endsWith(ext))) {
-            throw new Error("El archivo debe ser PDF, JPG, JPEG o PNG.");
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            throw new Error("El archivo supera el límite de 10 MB.");
-        }
-    }
+        $('tituloFormulario').textContent = "Editar pieza";
+        $('estadoEdicion').classList.remove('hidden');
+        $('btnCancelarEdicion').classList.remove('hidden');$('btnGuardar').textContent = "💾 Actualizar pieza";
 
-    function mostrarProgresoArchivo(mostrar, porcentaje = 0, texto = "") {
-        $("progresoArchivo").classList.toggle("hidden", !mostrar);
-        $("barraProgreso").style.width = `${porcentaje}%`;
-        $("textoProgreso").textContent = texto || `${porcentaje}%`;
-    }
-
-    function previsualizarArchivo(event) {
-        const file = event.target.files?.[0];
-        const iframe = $("pdfVisor");
-        const img = $("imgVisor");
-        const texto = $("textoVisorVacio");
-
-        if (previewObjectUrl) {
-            URL.revokeObjectURL(previewObjectUrl);
-            previewObjectUrl = null;
-        }
-
-        if (!file) {
-            iframe.src = "";
-            img.src = "";
-            iframe.classList.add("hidden");
-            img.classList.add("hidden");
-            texto.classList.remove("hidden");
-            $("estadoArchivo").textContent = "Sin archivo";
-            return;
-        }
-
-        try {
-            validarArchivo(file);
-        } catch (error) {
-            alert(error.message);
-            event.target.value = "";
-            return;
-        }
-
-        previewObjectUrl = URL.createObjectURL(file);
-        texto.classList.add("hidden");
-        $("estadoArchivo").textContent = file.name;
-
-        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-            img.classList.add("hidden");
-            img.src = "";
-            iframe.src = previewObjectUrl;
-            iframe.classList.remove("hidden");
+        if(p.archivo_url) {
+            $('btnQuitarArchivoExistente').classList.remove('hidden');$('estadoArchivo').textContent = "Archivo actual en servidor";
         } else {
-            iframe.classList.add("hidden");
-            iframe.src = "";
-            img.src = previewObjectUrl;
-            img.classList.remove("hidden");
+            $('btnQuitarArchivoExistente').classList.add('hidden');
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelarEdicion() {
+        $('formPieza').reset();$('editDocId').value = "";
+        $('archivoUrlActual').value = "";
+        $('archivoPathActual').value = "";
+        $('quitarArchivo').value = "0";
+        
+        $('tituloFormulario').textContent = "Registrar nueva pieza";
+        $('estadoEdicion').classList.add('hidden');
+        $('btnCancelarEdicion').classList.add('hidden');$('btnGuardar').textContent = "💾 Guardar pieza";
+        $('btnQuitarArchivoExistente').classList.add('hidden');
+        
+        limpiarArchivoSeleccionado();
+        actualizarCodigoVistaPrevia();
+    }
+
+    // =========================
+    // VISOR DE ARCHIVOS
+    // =========================
+    function previsualizarArchivo(e) {
+        const file = e.target.files[0];
+        if(!file) return limpiarArchivoSeleccionado();
+        
+        $('estadoArchivo').textContent = file.name;
+        $('quitarArchivo').value = "0";
+        $('btnQuitarArchivoExistente').classList.add('hidden');
+
+        if(previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = URL.createObjectURL(file);
+
+        $('textoVisorVacio').classList.add('hidden');
+        if(file.type === 'application/pdf') {
+            $('pdfVisor').src = previewObjectUrl;
+            $('pdfVisor').classList.remove('hidden');$('imgVisor').classList.add('hidden');
+        } else if(file.type.startsWith('image/')) {
+            $('imgVisor').src = previewObjectUrl;
+            $('imgVisor').classList.remove('hidden');$('pdfVisor').classList.add('hidden');
         }
     }
 
     function limpiarArchivoSeleccionado() {
-        $("archivoPlano").value = "";
-        previsualizarArchivo({ target: { files: [] } });
+        $('archivoPlano').value = '';
+        if(previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+        $('pdfVisor').classList.add('hidden');$('imgVisor').classList.add('hidden');
+        $('textoVisorVacio').classList.remove('hidden');$('estadoArchivo').textContent = "Sin archivo";
     }
 
     function quitarArchivoExistente() {
-        if (!$("archivoUrlActual").value) return;
-        $("quitarArchivo").value = "1";
-        $("archivoUrlActual").value = "";
-        $("archivoPathActual").dataset.oldPath = $("archivoPathActual").value;
-        $("archivoPathActual").value = "";
-        $("archivoNombreActual").value = "";
-        $("archivoTipoActual").value = "";
-        $("btnQuitarArchivoExistente").classList.add("hidden");
+        $('quitarArchivo').value = "1";
+        $('btnQuitarArchivoExistente').classList.add('hidden');$('estadoArchivo').textContent = "Archivo eliminado (se aplicará al guardar)";
         limpiarArchivoSeleccionado();
-        $("estadoArchivo").textContent = "Archivo guardado eliminado al actualizar";
-    }
-
-    async function editarPieza(id) {
-        const pieza = piezas.find(p => p.id === id);
-        if (!pieza) return;
-
-        piezaDetalleActual = pieza;
-
-        $("editDocId").value = pieza.id;
-        $("categoria").value = pieza.categoria || "V";
-        $("proceso").value = pieza.procesoLetra || "D";
-        $("nombre").value = pieza.nombre || "";
-        $("material").value = pieza.material || "";
-        $("calibre").value = pieza.calibre || "";
-        $("aplicacion").value = pieza.aplicacion || "";
-        $("stockActual").value = Number(pieza.stockActual || 0);
-        $("stockMin").value = Number(pieza.stockMin || 0);
-        $("stockMax").value = Number(pieza.stockMax || 1);
-
-        $("archivoUrlActual").value = pieza.archivoUrl || "";
-        $("archivoPathActual").value = pieza.archivoPath || "";
-        $("archivoPathActual").dataset.oldPath = pieza.archivoPath || "";
-        $("archivoNombreActual").value = pieza.archivoNombre || "";
-        $("archivoTipoActual").value = pieza.archivoTipo || "";
-        $("quitarArchivo").value = "0";
-
-        $("tituloFormulario").textContent = `Editar ${pieza.codigoPieza || "pieza"}`;
-        $("estadoEdicion").classList.remove("hidden");
-        $("btnCancelarEdicion").classList.remove("hidden");
-        $("btnGuardar").textContent = "💾 Actualizar pieza";
-
-        if (pieza.archivoUrl) {
-            mostrarArchivoGuardado(pieza.archivoUrl, pieza.archivoTipo, pieza.archivoNombre);
-            $("btnQuitarArchivoExistente").classList.remove("hidden");
-            $("estadoArchivo").textContent = pieza.archivoNombre || "Archivo guardado";
-        } else {
-            $("btnQuitarArchivoExistente").classList.add("hidden");
-            limpiarArchivoSeleccionado();
-        }
-
-        actualizarCodigoVistaPrevia();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    function mostrarArchivoGuardado(url, tipo = "", nombre = "") {
-        const iframe = $("pdfVisor");
-        const img = $("imgVisor");
-        const texto = $("textoVisorVacio");
-
-        texto.classList.add("hidden");
-
-        const esPdf = tipo === "application/pdf" || String(nombre).toLowerCase().endsWith(".pdf");
-        if (esPdf) {
-            img.classList.add("hidden");
-            iframe.src = url;
-            iframe.classList.remove("hidden");
-        } else {
-            iframe.classList.add("hidden");
-            img.src = url;
-            img.classList.remove("hidden");
-        }
-    }
-
-    function cancelarEdicion() {
-        resetFormulario();
-    }
-
-    function resetFormulario() {
-        $("formPieza").reset();
-        $("editDocId").value = "";
-        $("archivoUrlActual").value = "";
-        $("archivoPathActual").value = "";
-        $("archivoPathActual").dataset.oldPath = "";
-        $("archivoNombreActual").value = "";
-        $("archivoTipoActual").value = "";
-        $("quitarArchivo").value = "0";
-
-        $("tituloFormulario").textContent = "Registrar nueva pieza";
-        $("estadoEdicion").classList.add("hidden");
-        $("btnCancelarEdicion").classList.add("hidden");
-        $("btnQuitarArchivoExistente").classList.add("hidden");
-        $("btnGuardar").textContent = "💾 Guardar pieza";
-        $("stockActual").value = 0;
-        $("stockMin").value = 1;
-        $("stockMax").value = 5;
-
-        $("categoria").value = "V";
-        $("proceso").value = "D";
-
-        limpiarArchivoSeleccionado();
-        piezaDetalleActual = null;
-        actualizarCodigoVistaPrevia();
     }
 
     // =========================
-    // ELIMINAR
+    // LÓGICA DE SOLICITUDES
     // =========================
-    async function eliminarPieza(id) {
-        const pieza = piezas.find(p => p.id === id);
-        if (!pieza) return;
+    async function cargarSolicitudes() {
+        if (!window.supabaseReady) return;
+        const { data, error } = await supabaseClient.from('solicitudes').select('*').order('created_at', { ascending: false });
+        if (error) return console.error(error);
+        solicitudes = data || [];
+        $('statSolicitudes').textContent = solicitudes.filter(s => s.estado === 'Pendiente').length;
+        renderSolicitudes();
+    }
 
-        const confirmar = confirm(
-            `¿Seguro que quieres eliminar ${pieza.codigoPieza} - ${pieza.nombre}?\n\nEsta acción eliminará el registro de base de datos de Supabase.`
-        );
-        if (!confirmar) return;
+    function actualizarSelectPiezas() {
+        const select = $('solicitudPieza');
+        select.innerHTML = '<option value="">Selecciona una pieza</option>';
+        piezas.forEach(p => {
+            select.innerHTML += `<option value="${p.id}">${p.codigo} - ${p.nombre}</option>`;
+        });
+    }
+
+    async function guardarSolicitud(e) {
+        e.preventDefault();
+        const piezaId = $('solicitudPieza').value;
+        const pieza = piezas.find(p => p.id === piezaId);
+        if(!pieza) return;
+
+        const payload = {
+            pieza_id: piezaId,
+            pieza_nombre: pieza.nombre,
+            pieza_codigo: pieza.codigo,
+            cantidad: parseInt($('solicitudCantidad').value),
+            prioridad: $('solicitudPrioridad').value,
+            solicitante: $('solicitudSolicitante').value,
+            motivo: $('solicitudMotivo').value,
+            estado: 'Pendiente'
+        };
 
         try {
-            await window.supabaseList.deleteDoc(
-                window.supabaseList.doc(window.supabaseDB, "piezas", id)
-            );
-
-            if (pieza.archivoPath) {
-                try {
-                    await window.supabaseList.deleteObject(
-                        window.supabaseList.ref(window.supabaseStorage, pieza.archivoPath)
-                    );
-                } catch (err) {
-                    console.warn("Registro eliminado, pero el archivo no pudo borrarse:", err);
-                }
-            }
-
-            alert("Pieza eliminada correctamente.");
-            if ($("editDocId").value === id) resetFormulario();
-            await cargarPiezas();
-            cerrarDetalle();
-
+            await supabaseClient.from('solicitudes').insert([payload]);
+            $('formSolicitud').reset();
+            await cargarSolicitudes();
+            alert("Solicitud creada exitosamente.");
         } catch (error) {
             console.error(error);
-            alert("No se pudo eliminar: " + (error.message || error));
+            alert("Error al crear solicitud.");
+        }
+    }
+
+    function renderSolicitudes() {
+        const filtro = $('filtroSolicitudEstado').value;
+        const tbody = $('tablaSolicitudesBody');
+        tbody.innerHTML = '';
+        
+        let datos = solicitudes;
+        if(filtro) datos = datos.filter(s => s.estado === filtro);
+
+        if(datos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-500">No hay solicitudes.</td></tr>`;
+            return;
+        }
+
+        datos.forEach(s => {
+            let colorPrioridad = 'text-slate-600';
+            if (s.prioridad === 'Alta') colorPrioridad = 'text-orange-600 font-bold';
+            if (s.prioridad === 'Urgente') colorPrioridad = 'text-red-600 font-bold';
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5">${fechaTexto(s.created_at)}</td>
+                    <td class="p-2.5 font-bold">${s.pieza_codigo} <span class="font-normal text-xs block">${s.pieza_nombre}</span></td>
+                    <td class="p-2.5">${s.cantidad}</td>
+                    <td class="p-2.5 ${colorPrioridad}">${s.prioridad}</td>
+                    <td class="p-2.5">${s.solicitante}</td>
+                    <td class="p-2.5">
+                        <select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded p-1 text-xs">
+                            <option value="Pendiente" ${s.estado==='Pendiente'?'selected':''}>Pendiente</option>
+                            <option value="En proceso" ${s.estado==='En proceso'?'selected':''}>En proceso</option>
+                            <option value="Completada" ${s.estado==='Completada'?'selected':''}>Completada</option>
+                            <option value="Cancelada" ${s.estado==='Cancelada'?'selected':''}>Cancelada</option>
+                        </select>
+                    </td>
+                    <td class="p-2.5 truncate max-w-[150px]" title="${s.motivo || ''}">${s.motivo || '—'}</td>
+                </tr>
+            `;
+        });
+    }
+
+    async function cambiarEstadoSolicitud(id, nuevoEstado) {
+        try {
+            await supabaseClient.from('solicitudes').update({ estado: nuevoEstado }).eq('id', id);
+            await cargarSolicitudes();
+        } catch(error) {
+            console.error(error);
         }
     }
 
     // =========================
-    // DETALLE
+    // MODAL DETALLE
     // =========================
-    function verDetalle(id) {
-        const pieza = piezas.find(p => p.id === id);
-        if (!pieza) return;
+    function abrirDetalle(id) {
+        const p = piezas.find(x => x.id === id);
+        if(!p) return;
+        piezaDetalleActual = p;
 
-        piezaDetalleActual = pieza;
+        $('detalleCodigo').textContent = p.codigo;
+        $('dNombre').textContent = p.nombre;
+        $('dMaterial').textContent = p.material;
+        $('dCalibre').textContent = p.calibre;
+        $('dAplicacion').textContent = p.aplicacion || "—";
+        $('dStock').textContent = `${p.stock_actual} (Mín: ${p.stock_min} / Máx: ${p.stock_max})`;
+        
+        let estado = "OK";
+        if (p.stock_actual === 0) estado = "AGOTADO";
+        else if (p.stock_actual < p.stock_min) estado = "BAJO MÍNIMO";
+        $('dEstado').textContent = estado;
 
-        $("detalleTitulo").textContent = pieza.nombre || "Pieza";
-        $("detalleCodigo").textContent = pieza.codigoPieza || "Sin código";
-        $("dNombre").textContent = pieza.nombre || "—";
-        $("dMaterial").textContent = pieza.material || "—";
-        $("dCalibre").textContent = pieza.calibre || "—";
-        $("dAplicacion").textContent = pieza.aplicacion || "—";
-        $("dStock").textContent = `${Number(pieza.stockActual || 0)} unidades (min. ${Number(pieza.stockMin || 0)}, máx. ${Number(pieza.stockMax || 0)})`;
+        // Limpiar QR/Barcode previos
+        $('qrDetalle').innerHTML = '';
+        
+        // Generar QR
+        new QRCode($('qrDetalle'), {
+            text: p.codigo,
+            width: 128,
+            height: 128,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
 
-        const estado = estadoStock(pieza);
-        $("dEstado").innerHTML = `<span class="px-2 py-1 rounded-full text-xs font-bold ${estado.clase}">${estado.texto}</span>`;
+        // Generar Barcode
+        JsBarcode("#barcodeDetalle", p.codigo, {
+            format: "CODE128",
+            lineColor: "#0f172a",
+            width: 2,
+            height: 50,
+            displayValue: true
+        });
 
-        $("qrDetalle").innerHTML = "";
-        if (window.QRCode) {
-            new QRCode($("qrDetalle"), {
-                text: pieza.codigoPieza || "",
-                width: 170,
-                height: 170,
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        }
-
-        $("barcodeDetalle").innerHTML = "";
-        if (window.JsBarcode && pieza.codigoPieza) {
-            JsBarcode("#barcodeDetalle", pieza.codigoPieza, {
-                format: "CODE128",
-                displayValue: true,
-                fontSize: 12,
-                height: 45,
-                margin: 4
-            });
-        }
-
-        if (pieza.archivoUrl) {
-            $("detalleArchivo").innerHTML = `
-                <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-lg p-3">
-                    <div>
-                        <div class="font-semibold">Archivo asociado</div>
-                        <div class="text-xs text-slate-500">${escapeHtml(pieza.archivoNombre || "Plano / imagen")}</div>
-                    </div>
-                    <a href="${escapeHtml(pieza.archivoUrl)}" target="_blank" rel="noopener"
-                       class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
-                        Abrir archivo
-                    </a>
-                </div>`;
+        // Visor PDF
+        if (p.archivo_url) {
+            $('detalleArchivo').innerHTML = `
+                <div class="font-bold text-sm mb-2">Plano adjunto</div>
+                <a href="${p.archivo_url}" target="_blank" class="bg-blue-50 text-blue-700 px-3 py-2 rounded font-semibold text-sm inline-block mb-3">Abrir archivo completo</a>
+            `;
         } else {
-            $("detalleArchivo").innerHTML = `
-                <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-500">
-                    Esta pieza no tiene PDF o imagen asociado.
-                </div>`;
+            $('detalleArchivo').innerHTML = `<div class="text-slate-500 text-sm">No hay plano asociado.</div>`;
         }
 
-        $("btnDetalleEditar").onclick = () => {
+        // Acciones botones
+        $('btnDetalleEditar').onclick = () => { cerrarDetalle(); prepararEdicion(p.id); };$('btnDetalleSolicitud').onclick = () => {
             cerrarDetalle();
-            editarPieza(id);
+            mostrarSeccion('solicitudes');
+            $('solicitudPieza').value = p.id;
+            $('solicitudCantidad').focus();
         };
-        $("btnDetalleSolicitud").onclick = () => solicitarDesdeTabla(id);
-        $("btnDetallePDF").onclick = () => descargarPiezaPDF(id);
 
-        $("modalDetalle").classList.remove("hidden");
+        $('modalDetalle').classList.remove('hidden');
     }
 
     function cerrarDetalle() {
-        $("modalDetalle").classList.add("hidden");
+        $('modalDetalle').classList.add('hidden');
     }
 
     // =========================
     // ESCÁNER
     // =========================
-    async function abrirEscaner() {
-        $("modalEscaner").classList.remove("hidden");
-        $("mensajeEscaner").textContent = "Buscando cámaras...";
-        await detectarCamaras();
-    }
-
-    async function cerrarEscaner() {
-        await detenerCamara();
-        $("modalEscaner").classList.add("hidden");
-    }
-
-    async function detectarCamaras() {
-        const select = $("camaraSelect");
-        select.innerHTML = `<option value="">Detectando cámaras...</option>`;
-
-        if (!window.Html5Qrcode) {
-            $("mensajeEscaner").textContent = "No se cargó la librería del escáner. Revisa la conexión a internet.";
-            return;
-        }
-
-        try {
-            const cameras = await Html5Qrcode.getCameras();
-
-            if (!cameras?.length) {
-                select.innerHTML = `<option value="">No se detectaron cámaras</option>`;
-                $("mensajeEscaner").innerHTML =
-                    "El navegador no entregó una cámara. Comprueba permisos del sitio y usa <b>HTTPS o localhost</b>.";
-                return;
+    function abrirEscaner() {
+        $('modalEscaner').classList.remove('hidden');
+        $('mensajeEscaner').textContent = '';$('codigoManual').value = '';
+        
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length) {
+                const sel = $('camaraSelect');
+                sel.innerHTML = '';
+                devices.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.label}</option>` });
+            } else {
+                $('camaraSelect').innerHTML = '<option value="">Sin cámaras disponibles</option>';
             }
-
-            select.innerHTML = cameras.map((cam, i) =>
-                `<option value="${escapeHtml(cam.id)}">${escapeHtml(cam.label || `Cámara ${i + 1}`)}</option>`
-            ).join("");
-
-            // Preferir cámara trasera.
-            const trasera = cameras.find(c => /back|rear|environment|trasera/i.test(c.label || ""));
-            if (trasera) select.value = trasera.id;
-
-            $("mensajeEscaner").textContent = `${cameras.length} cámara(s) detectada(s). Presiona "Iniciar".`;
-
-        } catch (error) {
-            console.error(error);
-            select.innerHTML = `<option value="">No se pudo acceder a las cámaras</option>`;
-            $("mensajeEscaner").textContent =
-                "Permiso de cámara rechazado o contexto no seguro. Abre el sitio mediante HTTPS o localhost y acepta el permiso.";
-        }
+        }).catch(err => console.error(err));
     }
 
-    async function iniciarCamara() {
-        if (!window.Html5Qrcode) {
-            alert("No se cargó la librería del escáner.");
-            return;
-        }
+    function cerrarEscaner() {
+        detenerCamara();
+        $('modalEscaner').classList.add('hidden');
+    }
 
-        await detenerCamara();
+    function iniciarCamara() {
+        if(escanerActivo) return;
+        const camId = $('camaraSelect').value;
+        if(!camId) return alert("Selecciona una cámara");
 
-        const cameraId = $("camaraSelect").value;
-        if (!cameraId) {
-            await detectarCamaras();
-            if (!$("camaraSelect").value) return;
-        }
-
-        const selectedCameraId = $("camaraSelect").value;
         escaner = new Html5Qrcode("reader");
-
-        const formats = window.Html5QrcodeSupportedFormats;
-        const formatsToSupport = formats ? [
-            formats.QR_CODE,
-            formats.CODE_128,
-            formats.CODE_39,
-            formats.EAN_13,
-            formats.EAN_8,
-            formats.UPC_A,
-            formats.UPC_E,
-            formats.ITF
-        ].filter(Boolean) : undefined;
-
-        try {
-            const config = {
-                fps: 10,
-                qrbox: { width: 300, height: 160 },
-                rememberLastUsedCamera: true,
-                aspectRatio: 1.777778
-            };
-            if (formatsToSupport?.length) config.formatsToSupport = formatsToSupport;
-
-            await escaner.start(
-                selectedCameraId,
-                config,
-                async decodedText => {
-                    await procesarCodigoEscaneado(decodedText);
-                },
-                () => {}
-            );
-
+        escaner.start(
+            camId, 
+            { fps: 10, qrbox: {width: 250, height: 250} },
+            (decodedText, decodedResult) => {
+                detenerCamara();
+                cerrarEscaner();
+                buscarPorCodigo(decodedText);
+            },
+            (errorMessage) => { /* Ignorar errores de escaneo continuo */ }
+        ).then(() => {
             escanerActivo = true;
-            $("mensajeEscaner").innerHTML = "Escaneando... apunta al QR o código de barras de la pieza.";
+        }).catch(err => {
+            console.log(err);
+            $('mensajeEscaner').textContent = "Error al iniciar cámara. " + err;
+        });
+    }
 
-        } catch (error) {
-            console.error(error);
-            escaner = null;
-            escanerActivo = false;
-            $("mensajeEscaner").innerHTML =
-                "No se pudo iniciar la cámara. Verifica permisos, HTTPS/localhost y que otra aplicación no esté usando la cámara.";
+    function detenerCamara() {
+        if(escaner && escanerActivo) {
+            escaner.stop().then(() => { escanerActivo = false; }).catch(err => console.error(err));
         }
     }
 
-    async function detenerCamara() {
-        if (escaner) {
-            try {
-                if (escanerActivo) await escaner.stop();
-                await escaner.clear();
-            } catch (error) {
-                console.warn("Error al detener escáner:", error);
-            }
-        }
-        escaner = null;
-        escanerActivo = false;
-        $("reader").innerHTML = "";
+    function buscarCodigoManual() {
+        const cod = $('codigoManual').value.trim().toUpperCase();
+        if(!cod) return;
+        cerrarEscaner();
+        buscarPorCodigo(cod);
     }
 
-    async function procesarCodigoEscaneado(codigo) {
-        const limpio = String(codigo || "").trim().toUpperCase();
-        if (!limpio) return;
-
-        $("codigoManual").value = limpio;
-        $("mensajeEscaner").textContent = `Código leído: ${limpio}`;
-
-        await detenerCamara();
-        $("modalEscaner").classList.add("hidden");
-
-        const pieza = piezas.find(p =>
-            normalizar(p.codigoPieza) === limpio ||
-            normalizar(p.numero) === limpio
-        );
-
-        if (pieza) {
-            verDetalle(pieza.id);
-            // Resalta y lleva al registro.
-            setTimeout(() => {
-                aplicarFiltros();
-                const fila = [...$("tablaPiezasBody").querySelectorAll("tr")]
-                    .find(tr => tr.innerText.includes(pieza.codigoPieza));
-                fila?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 200);
+    function buscarPorCodigo(codigoBuscado) {
+        const pieza = piezas.find(p => p.codigo === codigoBuscado);
+        if(pieza) {
+            mostrarSeccion('inventario');
+            abrirDetalle(pieza.id);
         } else {
-            alert(`El código ${limpio} no está registrado en el inventario.`);
-        }
-    }
-
-    async function buscarCodigoManual() {
-        await procesarCodigoEscaneado($("codigoManual").value);
-    }
-
-    // =========================
-    // SOLICITUDES
-    // =========================
-    function llenarSelectPiezasSolicitud() {
-        const select = $("solicitudPieza");
-        const actual = select.value;
-
-        select.innerHTML = `<option value="">Selecciona una pieza</option>` +
-            piezas
-                .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"))
-                .map(p => `<option value="${p.id}">${escapeHtml(p.codigoPieza)} · ${escapeHtml(p.nombre)} · Stock: ${Number(p.stockActual || 0)}</option>`)
-                .join("");
-
-        if (piezas.some(p => p.id === actual)) select.value = actual;
-    }
-
-    function solicitarDesdeTabla(id) {
-        const pieza = piezas.find(p => p.id === id);
-        if (!pieza) return;
-
-        mostrarSeccion("solicitudes");
-        $("solicitudPieza").value = id;
-        $("solicitudCantidad").value = Math.max(1, Number(pieza.stockMax || 1) - Number(pieza.stockActual || 0));
-        $("solicitudPrioridad").value = Number(pieza.stockActual || 0) === 0 ? "Urgente" : "Alta";
-
-        window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    async function guardarSolicitud(e) {
-        e.preventDefault();
-
-        if (!window.supabaseReady) {
-            alert("Supabase no está listo.");
-            return;
-        }
-
-        const btn = $("btnSolicitud");
-        btn.disabled = true;
-        btn.textContent = "Creando...";
-
-        try {
-            const pieza = piezas.find(p => p.id === $("solicitudPieza").value);
-            if (!pieza) throw new Error("Selecciona una pieza válida.");
-
-            await window.supabaseList.addDoc(
-                window.supabaseList.collection(window.supabaseDB, "solicitudesPiezas"),
-                {
-                    piezaId: pieza.id,
-                    codigoPieza: pieza.codigoPieza || "",
-                    nombrePieza: pieza.nombre || "",
-                    cantidad: Math.max(1, parseInt($("solicitudCantidad").value, 10) || 1),
-                    prioridad: $("solicitudPrioridad").value,
-                    solicitante: $("solicitudSolicitante").value.trim(),
-                    motivo: $("solicitudMotivo").value.trim(),
-                    estado: "Pendiente",
-                    fechaSolicitud: window.supabaseList.serverTimestamp()
-                }
-            );
-
-            alert("Solicitud creada correctamente.");
-            $("formSolicitud").reset();
-            $("solicitudCantidad").value = 1;
-            await cargarSolicitudes();
-
-        } catch (error) {
-            console.error(error);
-            alert("No se pudo crear la solicitud: " + (error.message || error));
-        } finally {
-            btn.disabled = false;
-            btn.textContent = "📝 Crear solicitud";
-        }
-    }
-
-    function renderSolicitudes() {
-        const filtro = $("filtroSolicitudEstado").value;
-        const lista = solicitudes.filter(s => !filtro || s.estado === filtro);
-        const tbody = $("tablaSolicitudesBody");
-
-        if (!lista.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400">No hay solicitudes.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = lista.map(s => {
-            const prioridadClase =
-                s.prioridad === "Urgente" ? "bg-red-100 text-red-700" :
-                s.prioridad === "Alta" ? "bg-amber-100 text-amber-700" :
-                "bg-slate-100 text-slate-600";
-
-            return `
-            <tr class="hover:bg-slate-50">
-                <td class="p-2.5">${fechaTexto(s.fechaSolicitud)}</td>
-                <td class="p-2.5"><b>${escapeHtml(s.codigoPieza)}</b><br>${escapeHtml(s.nombrePieza)}</td>
-                <td class="p-2.5 font-bold">${Number(s.cantidad || 0)}</td>
-                <td class="p-2.5"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${prioridadClase}">${escapeHtml(s.prioridad || "Normal")}</span></td>
-                <td class="p-2.5">${escapeHtml(s.solicitante || "—")}</td>
-                <td class="p-2.5">
-                    <select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded p-1 text-xs font-semibold">
-                        ${["Pendiente", "En proceso", "Completada", "Cancelada"].map(e =>
-                            `<option value="${e}" ${s.estado === e ? "selected" : ""}>${e}</option>`
-                        ).join("")}
-                    </select>
-                </td>
-                <td class="p-2.5 max-w-[220px]">${escapeHtml(s.motivo || "—")}</td>
-            </tr>`;
-        }).join("");
-    }
-
-    async function cambiarEstadoSolicitud(id, estado) {
-        try {
-            await window.supabaseList.updateDoc(
-                window.supabaseList.doc(window.supabaseDB, "solicitudesPiezas", id),
-                { estado, fechaActualizacion: window.supabaseList.serverTimestamp() }
-            );
-            await cargarSolicitudes();
-        } catch (error) {
-            console.error(error);
-            alert("No se pudo actualizar el estado.");
+            alert("No se encontró ninguna pieza con el código: " + codigoBuscado);
         }
     }
 
     // =========================
-    // ESTADÍSTICAS
+    // GENERACIÓN PDF
     // =========================
-    function actualizarEstadisticas() {
-        $("statPiezas").textContent = piezas.length;
-        $("statUnidades").textContent = piezas.reduce((sum, p) => sum + Number(p.stockActual || 0), 0);
-        $("statBajoMin").textContent = piezas.filter(p => Number(p.stockActual || 0) <= Number(p.stockMin || 0)).length;
-        $("statSolicitudes").textContent = solicitudes.filter(s => s.estado === "Pendiente").length;
-    }
-
-    // =========================
-    // PDF
-    // =========================
-    function asegurarPDF() {
-        if (!window.jspdf?.jsPDF) {
-            alert("No se cargó la librería de PDF. Revisa la conexión a internet.");
-            return false;
-        }
-        if (!window.jspdf.jsPDF.prototype.autoTable) {
-            alert("No se cargó AutoTable para PDF.");
-            return false;
-        }
-        return true;
-    }
-
     function descargarInventarioPDF() {
-        if (!asegurarPDF()) return;
-
-        const lista = obtenerListaFiltrada();
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: "landscape" });
-
+        const doc = new jsPDF();
+        
         doc.setFontSize(16);
-        doc.text("VOLMEX - Inventario de piezas", 14, 15);
-        doc.setFontSize(9);
-        doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 14, 21);
+        doc.text("VOLMEX - Inventario de Piezas", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 22);
 
-        const body = lista.map(p => [
-            p.numero || "",
-            p.codigoPieza || "",
-            p.nombre || "",
-            p.material || "",
-            p.calibre || "",
-            String(p.stockActual ?? 0),
-            String(p.stockMin ?? 0),
-            Number(p.stockActual || 0) <= Number(p.stockMin || 0) ? "BAJO" : "OK",
-            p.aplicacion || ""
+        const columns = ["Código", "Nombre", "Mat.", "Calibre", "Stock", "Mín"];
+        const rows = piezas.map(p => [
+            p.codigo, 
+            p.nombre.substring(0, 20), 
+            p.material, 
+            p.calibre, 
+            p.stock_actual.toString(), 
+            p.stock_min.toString()
         ]);
 
         doc.autoTable({
-            startY: 27,
-            head: [["No.", "Código", "Nombre", "Material", "Calibre", "Stock", "Mín.", "Estado", "Aplicación"]],
-            body,
-            styles: { fontSize: 7, cellPadding: 2 },
-            headStyles: { fillColor: [234, 88, 12] }
+            startY: 28,
+            head: [columns],
+            body: rows,
+            theme: 'grid',
+            headStyles: { fillColor: [234, 88, 12] } // Naranja VOLMEX
         });
 
-        doc.save(`VOLMEX_Inventario_${fechaArchivo()}.pdf`);
+        doc.save(`Inventario_VOLMEX_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
-    function descargarPiezaPDF(id) {
-        if (!asegurarPDF()) return;
-        const pieza = piezas.find(p => p.id === id);
-        if (!pieza) return;
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const estado = estadoStock(pieza);
-
-        doc.setFontSize(18);
-        doc.text("VOLMEX", 14, 18);
-
-        doc.setFontSize(12);
-        doc.text("Ficha de pieza en stock", 14, 26);
-
-        doc.setFontSize(10);
-        const filas = [
-            ["Código", pieza.codigoPieza || "—"],
-            ["No.", pieza.numero || "—"],
-            ["Nombre", pieza.nombre || "—"],
-            ["Categoría", pieza.categoria || "—"],
-            ["Proceso", pieza.procesoLetra || "—"],
-            ["Material", pieza.material || "—"],
-            ["Calibre / espesor", pieza.calibre || "—"],
-            ["Aplicación", pieza.aplicacion || "—"],
-            ["Stock actual", String(pieza.stockActual ?? 0)],
-            ["Stock mínimo", String(pieza.stockMin ?? 0)],
-            ["Stock máximo", String(pieza.stockMax ?? 0)],
-            ["Estado", estado.texto],
-            ["Archivo", pieza.archivoNombre || "Sin archivo"],
-            ["Registro", fechaTexto(pieza.fechaRegistro)]
-        ];
-
-        doc.autoTable({
-            startY: 33,
-            head: [["Dato", "Información"]],
-            body: filas,
-            styles: { fontSize: 9, cellPadding: 3 },
-            headStyles: { fillColor: [234, 88, 12] },
-            columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 } }
-        });
-
-        // Generar QR temporal para integrarlo al PDF.
-        const qrTemp = document.createElement("div");
-        qrTemp.style.position = "fixed";
-        qrTemp.style.left = "-10000px";
-        qrTemp.style.top = "0";
-        document.body.appendChild(qrTemp);
-
-        if (window.QRCode) {
-            new QRCode(qrTemp, {
-                text: pieza.codigoPieza || "",
-                width: 170,
-                height: 170
-            });
-        }
-
-        setTimeout(() => {
-            try {
-                const qrElement = qrTemp.querySelector("canvas") || qrTemp.querySelector("img");
-                const dataUrl = qrElement?.toDataURL ? qrElement.toDataURL("image/png") : qrElement?.src;
-                if (dataUrl) {
-                    doc.addImage(dataUrl, "PNG", 150, 35, 40, 40);
-                }
-            } catch (err) {
-                console.warn("No se pudo insertar QR al PDF:", err);
-            } finally {
-                document.body.removeChild(qrTemp);
-                doc.save(`${pieza.codigoPieza || "pieza"}_${fechaArchivo()}.pdf`);
-            }
-        }, 200);
-    }
-
-    function obtenerListaFiltrada() {
-        const nombre = normalizar($("filtroNombre").value);
-        const material = normalizar($("filtroMaterial").value);
-        const calibre = String($("filtroCalibre").value || "").trim();
-        const categoria = $("filtroCategoria").value;
-        const estado = $("filtroEstadoStock").value;
-
-        return piezas.filter(p => {
-            const n = normalizar(p.nombre);
-            const c = normalizar(p.codigoPieza);
-            const coincideNombre = !nombre || n.includes(nombre) || c.includes(nombre);
-            const coincideMaterial = !material || normalizar(p.material) === material;
-            const coincideCalibre = !calibre || String(p.calibre || "").trim() === calibre;
-            const coincideCategoria = !categoria || p.categoria === categoria;
-
-            const bajo = Number(p.stockActual || 0) <= Number(p.stockMin || 0);
-            const cero = Number(p.stockActual || 0) === 0;
-            const coincideEstado =
-                !estado ||
-                (estado === "BAJO" && bajo) ||
-                (estado === "OK" && !bajo) ||
-                (estado === "CERO" && cero);
-
-            return coincideNombre && coincideMaterial && coincideCalibre && coincideCategoria && coincideEstado;
-        });
-    }
-
-    function fechaArchivo() {
-        const d = new Date();
-        const pad = n => String(n).padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    }
-
-    // Cerrar modales haciendo clic en el fondo.
-    $("modalEscaner").addEventListener("click", e => {
-        if (e.target === $("modalEscaner")) cerrarEscaner();
-    });
-
-    $("modalDetalle").addEventListener("click", e => {
-        if (e.target === $("modalDetalle")) cerrarDetalle();
-    });
-
-    actualizarCodigoVistaPrevia();
 </script>
-
 </body>
 </html>
