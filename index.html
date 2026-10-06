@@ -6,15 +6,10 @@
     <title>VOLMEX - Control y Clasificación de Piezas</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Escáner QR / códigos de barras -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <!-- Generación de QR y código de barras -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <!-- Generación de PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -103,7 +98,6 @@
                     <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
                         <div class="text-xs font-semibold text-orange-700">Código de pieza</div>
                         <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VD-P-001</div>
-                        <div id="ayudaCodigo" class="text-[11px] text-orange-700 mt-1">Se asigna automáticamente.</div>
                     </div>
 
                     <div>
@@ -142,42 +136,9 @@
                         </div>
                     </div>
 
-                    <!-- ARCHIVO -->
-                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-3 bg-slate-50">
-                        <div class="flex items-center justify-between gap-2">
-                            <div>
-                                <div class="font-semibold text-sm">Plano / imagen</div>
-                                <div class="text-[11px] text-slate-500">PDF, JPG, JPEG o PNG · máximo 10 MB</div>
-                            </div>
-                            <span id="estadoArchivo" class="text-[11px] text-slate-500">Sin archivo</span>
-                        </div>
-
-                        <input type="file" id="archivoPlano" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                               onchange="previsualizarArchivo(event)"
-                               class="mt-2 block w-full text-xs">
-
-                        <div class="flex gap-2 mt-2">
-                            <button type="button" onclick="limpiarArchivoSeleccionado()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg px-3 py-2 text-xs font-semibold">
-                                Quitar selección
-                            </button>
-                            <button type="button" onclick="quitarArchivoExistente()" id="btnQuitarArchivoExistente" class="hidden flex-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg px-3 py-2 text-xs font-semibold">
-                                Quitar archivo guardado
-                            </button>
-                        </div>
-
-                        <div id="contenedorVisor" class="mt-3 h-48 border rounded-lg bg-slate-200 flex items-center justify-center overflow-hidden">
-                            <span id="textoVisorVacio" class="text-xs text-slate-500 p-4 text-center">Aquí aparecerá la previsualización del PDF o imagen.</span>
-                            <iframe id="pdfVisor" class="w-full h-full hidden" title="Vista previa PDF"></iframe>
-                            <img id="imgVisor" class="max-h-full max-w-full object-contain hidden" alt="Vista previa de pieza">
-                        </div>
-                    </div>
-
                     <input type="hidden" id="editDocId" value="">
-                    <input type="hidden" id="archivoUrlActual" value="">
-                    <input type="hidden" id="archivoPathActual" value="">
-                    <input type="hidden" id="quitarArchivo" value="0">
 
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 pt-2">
                         <button type="submit" id="btnGuardar" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow">
                             💾 Guardar pieza
                         </button>
@@ -202,8 +163,7 @@
 
                 <!-- FILTROS -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
-                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre o código..."
-                           class="border rounded-lg p-2.5 text-sm">
+                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre o código..." class="border rounded-lg p-2.5 text-sm">
                     <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
                         <option value="">Todos los materiales</option>
                     </select>
@@ -227,7 +187,7 @@
                 </div>
 
                 <div class="overflow-x-auto border rounded-lg">
-                    <table class="w-full text-xs text-left min-w-[1050px]">
+                    <table class="w-full text-xs text-left min-w-[850px]">
                         <thead>
                             <tr class="bg-slate-100 text-slate-700 border-b">
                                 <th class="p-2.5">No.</th>
@@ -237,12 +197,11 @@
                                 <th class="p-2.5">Calibre</th>
                                 <th class="p-2.5 text-center">Stock</th>
                                 <th class="p-2.5">Estado</th>
-                                <th class="p-2.5">Archivo asociado</th>
                                 <th class="p-2.5">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="tablaPiezasBody" class="divide-y">
-                            <tr><td colspan="9" class="p-5 text-center text-slate-400">Cargando...</td></tr>
+                            <tr><td colspan="8" class="p-5 text-center text-slate-400">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -306,7 +265,7 @@
                 </div>
 
                 <div class="overflow-x-auto border rounded-lg">
-                    <table class="w-full text-xs text-left min-w-[800px]">
+                    <table class="w-full text-xs text-left min-w-[700px]">
                         <thead>
                             <tr class="bg-slate-100 border-b">
                                 <th class="p-2.5">Fecha</th>
@@ -315,11 +274,10 @@
                                 <th class="p-2.5">Prioridad</th>
                                 <th class="p-2.5">Solicita</th>
                                 <th class="p-2.5">Estado</th>
-                                <th class="p-2.5">Motivo</th>
                             </tr>
                         </thead>
                         <tbody id="tablaSolicitudesBody" class="divide-y">
-                            <tr><td colspan="7" class="p-5 text-center text-slate-400">Cargando...</td></tr>
+                            <tr><td colspan="6" class="p-5 text-center text-slate-400">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -328,82 +286,27 @@
     </section>
 </main>
 
-<!-- MODAL VISOR DE ARCHIVO -->
-<div id="modalArchivo" class="hidden fixed inset-0 bg-black/80 z-[60] p-4 overflow-y-auto">
-    <div class="min-h-full flex items-center justify-center">
-        <div class="bg-white rounded-2xl w-full max-w-5xl p-4 shadow-2xl">
-            <div class="flex items-center justify-between gap-3 border-b pb-3 mb-3">
-                <div>
-                    <div class="font-bold text-lg">Archivo asociado a la pieza</div>
-                    <div id="visorArchivoNombre" class="text-xs text-slate-500 mt-1"></div>
-                </div>
-                <button onclick="cerrarVisorArchivo()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
-            </div>
-
-            <div id="visorArchivoContenedor" class="w-full h-[70vh] bg-slate-100 border rounded-xl overflow-hidden flex items-center justify-center">
-                <div id="visorArchivoCargando" class="text-slate-500 text-sm">Cargando archivo...</div>
-                <iframe id="visorArchivoPDF" class="w-full h-full hidden" title="Visor de PDF"></iframe>
-                <img id="visorArchivoIMG" class="max-w-full max-h-full object-contain hidden" alt="Archivo de pieza">
-                <div id="visorArchivoError" class="hidden text-center text-red-600 text-sm p-5"></div>
-            </div>
-
-            <div class="flex flex-wrap gap-2 mt-3">
-                <button id="btnAbrirArchivoPestana" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">↗ Abrir en nueva pestaña</button>
-                <button onclick="cerrarVisorArchivo()" class="bg-slate-200 hover:bg-slate-300 rounded-lg px-4 py-2 font-semibold ml-auto">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- MODAL ESCÁNER -->
 <div id="modalEscaner" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
     <div class="min-h-full flex items-center justify-center">
-        <div class="bg-white rounded-2xl w-full max-w-2xl p-5 shadow-2xl">
+        <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
             <div class="flex items-center justify-between mb-3">
-                <div>
-                    <h3 class="font-bold text-lg">Escanear QR / código de barras</h3>
-                    <p class="text-xs text-slate-500">La cámara busca directamente el código de la pieza.</p>
-                </div>
+                <h3 class="font-bold text-lg">Escanear código QR</h3>
                 <button onclick="cerrarEscaner()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
             </div>
-
-            <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg p-3 mb-3">
-                <b>Importante:</b> el acceso a la cámara normalmente requiere <b>HTTPS o localhost</b>.
-                Si abriste el HTML directamente desde una carpeta (<code>file://</code>), usa Live Server u otro servidor local.
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
-                <select id="camaraSelect" class="md:col-span-2 border rounded-lg p-2.5">
-                    <option value="">Detectando cámaras...</option>
-                </select>
-                <button onclick="iniciarCamara()" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg px-3 py-2 font-bold">
-                    ▶ Iniciar
-                </button>
-            </div>
-
-            <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[240px] overflow-hidden"></div>
-
+            <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[200px]"></div>
             <div class="mt-3 flex gap-2">
-                <button onclick="detenerCamara()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg py-2 font-semibold">⏹ Detener</button>
-                <button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-2 font-semibold">Cerrar</button>
-            </div>
-
-            <div class="border-t mt-4 pt-4">
-                <label class="block font-semibold text-sm mb-1">También puedes escribir el código</label>
-                <div class="flex gap-2">
-                    <input id="codigoManual" class="flex-1 border rounded-lg p-2.5" placeholder="Ej. VSD-P-001">
-                    <button onclick="buscarCodigoManual()" class="bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-4 font-bold">Buscar</button>
-                </div>
-                <div id="mensajeEscaner" class="text-xs text-slate-500 mt-2"></div>
+                <button onclick="detenerCamara()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg py-2 text-xs font-semibold">⏹ Detener</button>
+                <button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-2 text-xs font-semibold">Cerrar</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- MODAL DETALLE / CÓDIGO -->
+<!-- MODAL DETALLE / QR -->
 <div id="modalDetalle" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
     <div class="min-h-full flex items-center justify-center">
-        <div class="bg-white rounded-2xl max-w-4xl w-full p-5 shadow-2xl">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl">
             <div class="flex items-center justify-between border-b pb-3">
                 <div>
                     <h3 id="detalleTitulo" class="font-bold text-xl">Detalle de pieza</h3>
@@ -411,105 +314,61 @@
                 </div>
                 <button onclick="cerrarDetalle()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 py-5">
-                <div class="md:col-span-2 grid grid-cols-2 gap-3 text-sm">
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Nombre:</b><div id="dNombre"></div></div>
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Material:</b><div id="dMaterial"></div></div>
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Calibre:</b><div id="dCalibre"></div></div>
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Aplicación:</b><div id="dAplicacion"></div></div>
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Stock actual:</b><div id="dStock"></div></div>
-                    <div class="bg-slate-50 rounded-lg p-3"><b>Estado:</b><div id="dEstado"></div></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 text-sm">
+                <div class="space-y-2">
+                    <div class="bg-slate-50 p-2 rounded"><b>Nombre:</b> <span id="dNombre"></span></div>
+                    <div class="bg-slate-50 p-2 rounded"><b>Material:</b> <span id="dMaterial"></span></div>
+                    <div class="bg-slate-50 p-2 rounded"><b>Calibre:</b> <span id="dCalibre"></span></div>
+                    <div class="bg-slate-50 p-2 rounded"><b>Aplicación:</b> <span id="dAplicacion"></span></div>
+                    <div class="bg-slate-50 p-2 rounded"><b>Stock actual:</b> <span id="dStock"></span></div>
                 </div>
-
-                <div class="border rounded-xl p-3 text-center">
+                <div class="border rounded-xl p-3 text-center flex flex-col items-center justify-center">
                     <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div>
-                    <div id="qrDetalle" class="flex justify-center min-h-[170px]"></div>
-                    <svg id="barcodeDetalle" class="w-full mt-3"></svg>
-                    <div class="text-[11px] text-slate-500 mt-2">Escanéalo para localizar la pieza.</div>
+                    <div id="qrDetalle"></div>
                 </div>
             </div>
-
-            <div id="detalleArchivo" class="border-t pt-4 mb-4"></div>
-
-            <div class="flex flex-wrap gap-2">
-                <button id="btnDetalleEditar" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">✏️ Editar</button>
-                <button id="btnDetalleSolicitud" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg px-4 py-2 font-semibold">📝 Solicitar piezas</button>
-                <button onclick="cerrarDetalle()" class="bg-slate-200 hover:bg-slate-300 rounded-lg px-4 py-2 font-semibold ml-auto">Cerrar</button>
+            <div class="flex gap-2 border-t pt-3">
+                <button id="btnDetalleEditar" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">✏️ Editar</button>
+                <button onclick="cerrarDetalle()" class="bg-slate-200 rounded-lg px-4 py-2 text-xs font-semibold ml-auto">Cerrar</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // ============================================================
-    // SUPABASE - CONFIGURACIÓN
-    // ============================================================
-    // Sustituye con tus credenciales reales
     const SUPABASE_URL = "https://bnnixbgctotrptoxjxhw.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJubml4YmdjdG90cnB0b3hqeGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTgyNTksImV4cCI6MjEwNjgzNDI1OX0.MPlrkcRRr2sLs5Jwc3GzqttIAtHUZCxJaIf5qIFToB8";
-    const SUPABASE_BUCKET = "planos";
 
     const { createClient } = window.supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    window.supabaseReady = false;
+    let piezas = [];
+    let solicitudes = [];
+    let escaner = null;
+    const $ = id => document.getElementById(id);
 
     async function inicializarSupabase() {
         try {
-            if (SUPABASE_URL.includes("TU-PROYECTO")) {
-                throw new Error("Faltan credenciales de Supabase en el código.");
-            }
-            // Prueba de conexión
             const { error } = await supabaseClient.from("piezas").select("id", { head: true, count: "exact" });
             if (error) throw error;
-
             window.supabaseReady = true;
-            document.getElementById("estadoConexion").textContent = "Supabase conectado";
-            document.getElementById("estadoConexion").className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
-            
+            $('estadoConexion').textContent = "Supabase conectado";
+            $('estadoConexion').className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
             await cargarTodo();
-        } catch (error) {
-            console.error("Supabase Error:", error);
-            window.supabaseReady = false;
-            document.getElementById("tablaPiezasBody").innerHTML = `<tr><td colspan="9" class="p-5 text-center text-red-600 font-semibold">
-                No se pudo conectar con Supabase. Revisa tus credenciales o las tablas creadas. Error: ${error.message}
-            </td></tr>`;
-            document.getElementById("estadoConexion").textContent = "Supabase sin conexión";
-            document.getElementById("estadoConexion").className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
+        } catch (err) {
+            console.error(err);
+            $('estadoConexion').textContent = "Error de conexión";
+            $('estadoConexion').className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
         }
     }
 
     window.addEventListener("DOMContentLoaded", inicializarSupabase);
 
-    // =========================
-    // ESTADO LOCAL Y VARIABLES
-    // =========================
-    let piezas = [];
-    let solicitudes = [];
-    let escaner = null;
-    let escanerActivo = false;
-    let piezaDetalleActual = null;
-    let previewObjectUrl = null;
-    const $ = id => document.getElementById(id);
-
-    function mostrarSeccion(seccion) {
-        $('seccionInventario').classList.add('hidden');
-        $('seccionSolicitudes').classList.add('hidden');
-        
-        if (seccion === 'inventario') $('seccionInventario').classList.remove('hidden');
-        if (seccion === 'solicitudes') $('seccionSolicitudes').classList.remove('hidden');
+    function mostrarSeccion(s) {
+        $('seccionInventario').classList.toggle('hidden', s !== 'inventario');
+        $('seccionSolicitudes').classList.toggle('hidden', s !== 'solicitudes');
     }
 
-    function fechaTexto(dateString) {
-        if (!dateString) return "—";
-        const d = new Date(dateString);
-        return isNaN(d.getTime()) ? "—" : d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-    }
-
-    // =========================
-    // LÓGICA DE PIEZAS
-    // =========================
     async function cargarTodo() {
         await cargarPiezas();
         await cargarSolicitudes();
@@ -518,7 +377,6 @@
     }
 
     async function cargarPiezas() {
-        if (!window.supabaseReady) return;
         const { data, error } = await supabaseClient.from('piezas').select('*').order('fecha_registro', { ascending: false });
         if (error) return console.error(error);
         piezas = data || [];
@@ -528,249 +386,138 @@
     }
 
     function actualizarCodigoVistaPrevia() {
-        if ($('editDocId').value) return; // Si estamos editando, mantenemos el código actual
+        if ($('editDocId').value) return;
         const cat = $('categoria').value;
         const proc = $('proceso').value;
-        const conteo = piezas.filter(p => p.codigo_pieza && p.codigo_pieza.startsWith(cat + 'S' + proc)).length + 1;
-        $('codigoGeneradoVista').textContent = `${cat}S${proc}-P-${String(conteo).padStart(3, '0')}`;
+        const conteo = piezas.filter(p => p.codigo_pieza && p.codigo_pieza.startsWith(cat + proc)).length + 1;
+        $('codigoGeneradoVista').textContent = `${cat}${proc}-P-${String(conteo).padStart(3, '0')}`;
     }
 
     async function guardarPieza(e) {
         e.preventDefault();
+        const id = $('editDocId').value;
+        const codigo = id ? $('codigoGeneradoVista').textContent : `${$('categoria').value}${$('proceso').value}-P-${String(piezas.length + 1).padStart(3, '0')}`;
 
-        try {
-            if (!window.supabaseReady) throw new Error('No hay conexión con Supabase.');
+        const payload = {
+            codigo_pieza: codigo,
+            nombre: $('nombre').value.toUpperCase(),
+            categoria: $('categoria').value,
+            proceso: $('proceso').value,
+            material: $('material').value.toUpperCase(),
+            calibre: $('calibre').value,
+            aplicacion: $('aplicacion').value,
+            stock_actual: parseInt($('stockActual').value),
+            stock_min: parseInt($('stockMin').value),
+            stock_max: parseInt($('stockMax').value)
+        };
 
-            const id = $('editDocId').value;
-            const archivoInput = $('archivoPlano').files[0];
-            const piezaAnterior = id ? piezas.find(x => x.id === id) : null;
+        let res = id 
+            ? await supabaseClient.from('piezas').update(payload).eq('id', id)
+            : await supabaseClient.from('piezas').insert([payload]);
 
-            let archivo_url = $('archivoUrlActual').value || '';
-            let archivo_path = $('archivoPathActual').value || '';
-            let archivo_nombre = piezaAnterior?.archivo_nombre || '';
-            let archivo_tipo = piezaAnterior?.archivo_tipo || '';
-            let archivoNuevoSubido = null;
-
-            // 1) Subir nuevo archivo, pero NO borrar todavía el anterior.
-            if (archivoInput) {
-                const fileExt = archivoInput.name.split('.').pop().toLowerCase();
-                const nombreSeguro = archivoInput.name
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^a-zA-Z0-9._-]+/g, '_');
-                const fileName = `${Date.now()}_${nombreSeguro}`;
-                const filePath = `planos/${fileName}`;
-
-                const { error: uploadError } = await supabaseClient
-                    .storage
-                    .from(SUPABASE_BUCKET)
-                    .upload(filePath, archivoInput, { upsert: false });
-
-                if (uploadError) throw new Error(`No se pudo subir el archivo: ${uploadError.message}`);
-
-                archivoNuevoSubido = filePath;
-                const { data: publicUrlData } = supabaseClient
-                    .storage
-                    .from(SUPABASE_BUCKET)
-                    .getPublicUrl(filePath);
-
-                if (!publicUrlData?.publicUrl) {
-                    throw new Error('El archivo se subió, pero Supabase no devolvió su URL.');
-                }
-
-                archivo_url = publicUrlData.publicUrl;
-                archivo_path = filePath;
-                archivo_nombre = archivoInput.name;
-                archivo_tipo = archivoInput.type || obtenerTipoMimeDesdePieza({ archivo_nombre: archivoInput.name });
-            } else if ($('quitarArchivo').value === '1') {
-                // Se marcará para eliminar después de actualizar la pieza.
-                archivo_url = '';
-                archivo_path = '';
-                archivo_nombre = '';
-                archivo_tipo = '';
-            }
-
-            const stock_actual = Number.parseInt($('stockActual').value, 10);
-            const stock_min = Number.parseInt($('stockMin').value, 10);
-            const stock_max = Number.parseInt($('stockMax').value, 10);
-
-            if (![stock_actual, stock_min, stock_max].every(Number.isInteger)) {
-                throw new Error('Los valores de stock deben ser números enteros.');
-            }
-            if (stock_actual < 0 || stock_min < 0 || stock_max < 1) {
-                throw new Error('Los valores de stock no son válidos.');
-            }
-            if (stock_max < stock_min) {
-                throw new Error('El stock máximo no puede ser menor que el stock mínimo.');
-            }
-
-            const payload = {
-                categoria: $('categoria').value,
-                proceso_letra: $('proceso').value,
-                nombre: $('nombre').value.trim().toUpperCase(),
-                material: $('material').value.trim().toUpperCase(),
-                calibre: $('calibre').value.trim().toUpperCase(),
-                aplicacion: $('aplicacion').value.trim(),
-                stock_actual,
-                stock_min,
-                stock_max,
-                punto_reorden: stock_actual <= stock_min ? 'SI' : 'NO',
-                archivo_url,
-                archivo_path,
-                archivo_nombre,
-                archivo_tipo,
-                fecha_actualizacion: new Date().toISOString()
-            };
-
-            if (!payload.nombre || !payload.material || !payload.calibre) {
-                throw new Error('Completa nombre, material y calibre.');
-            }
-
-            if (id) {
-                // 2) Actualizar registro.
-                const { error: updateError } = await supabaseClient
-                    .from('piezas')
-                    .update(payload)
-                    .eq('id', id);
-
-                if (updateError) throw updateError;
-
-                // 3) Solo después de guardar correctamente, eliminar el archivo anterior.
-                if (archivoInput && piezaAnterior?.archivo_path && piezaAnterior.archivo_path !== archivo_path) {
-                    const { error: removeOldError } = await supabaseClient.storage
-                        .from(SUPABASE_BUCKET)
-                        .remove([piezaAnterior.archivo_path]);
-                    if (removeOldError) console.warn('La pieza se actualizó, pero no se pudo eliminar el archivo anterior:', removeOldError.message);
-                }
-
-                if (!archivoInput && $('quitarArchivo').value === '1' && piezaAnterior?.archivo_path) {
-                    const { error: removeError } = await supabaseClient.storage
-                        .from(SUPABASE_BUCKET)
-                        .remove([piezaAnterior.archivo_path]);
-                    if (removeError) console.warn('La pieza se actualizó, pero no se pudo eliminar el archivo:', removeError.message);
-                }
-            } else {
-                // 2) Generar consecutivo seguro desde la función SQL.
-                const cat = payload.categoria;
-                const proc = payload.proceso_letra;
-                const { data: numero, error: rpcError } = await supabaseClient.rpc('siguiente_consecutivo', {
-                    p_categoria: cat,
-                    p_proceso: proc
-                });
-
-                if (rpcError) throw rpcError;
-                if (numero === null || numero === undefined) throw new Error('Supabase no devolvió el consecutivo de la pieza.');
-
-                const numFormateado = `P-${String(numero).padStart(3, '0')}`;
-                payload.numero = numFormateado;
-                payload.codigo_pieza = `${cat}S${proc}-${numFormateado}`;
-
-                const { error: insertError } = await supabaseClient
-                    .from('piezas')
-                    .insert([payload]);
-
-                if (insertError) throw insertError;
-            }
-
+        if (res.error) alert("Error guardando pieza: " + res.error.message);
+        else {
             cancelarEdicion();
             await cargarPiezas();
-            await cargarSolicitudes();
-            actualizarSelectPiezas();
-            alert(id ? 'Pieza actualizada exitosamente.' : 'Pieza guardada exitosamente.');
-
-        } catch (error) {
-            console.error('ERROR REAL AL GUARDAR PIEZA:', error);
-
-            // Si el archivo nuevo sí subió pero la BD falló, lo eliminamos para no dejar basura en Storage.
-            if (typeof archivoNuevoSubido === 'string') {
-                await supabaseClient.storage.from(SUPABASE_BUCKET).remove([archivoNuevoSubido]).catch(() => {});
-            }
-
-            const detalle = [
-                error?.message || 'Error desconocido',
-                error?.code ? `Código: ${error.code}` : '',
-                error?.details ? `Detalles: ${error.details}` : '',
-                error?.hint ? `Ayuda: ${error.hint}` : ''
-            ].filter(Boolean).join('\n');
-
-            alert(`No se pudo guardar la pieza.\n\n${detalle}`);
         }
     }
 
-    function renderPiezas(datos) {
-        const tbody = $('tablaPiezasBody');
-        tbody.innerHTML = '';
-        if(datos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-slate-500">No se encontraron piezas.</td></tr>`;
-            $('textoResultados').textContent = "0 resultados";
-            return;
-        }
-        
-        $('textoResultados').textContent = `${datos.length} resultado(s)`;
+    function editarPieza(id) {
+        const p = piezas.find(x => x.id === id);
+        if (!p) return;
+        $('editDocId').value = p.id;
+        $('categoria').value = p.categoria;
+        $('proceso').value = p.proceso;
+        $('codigoGeneradoVista').textContent = p.codigo_pieza;
+        $('nombre').value = p.nombre;
+        $('material').value = p.material;
+        $('calibre').value = p.calibre;
+        $('aplicacion').value = p.aplicacion \vert{}\vert{} '';$('stockActual').value = p.stock_actual;
+        $('stockMin').value = p.stock_min;
+        $('stockMax').value = p.stock_max;
 
-        datos.forEach((p, index) => {
-            const isBajoMin = p.stock_actual < p.stock_min;
-            const isCero = p.stock_actual === 0;
-            
-            let estadoHTML = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">OK</span>`;
-            if (isCero) estadoHTML = `<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold">AGOTADO</span>`;
-            else if (isBajoMin) estadoHTML = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold">BAJO</span>`;
+        $('tituloFormulario').textContent = "Editar pieza";
+        $('estadoEdicion').classList.remove('hidden');$('btnCancelarEdicion').classList.remove('hidden');
+    }
 
-            const hayArchivo = Boolean(p.archivo_url || p.archivo_path);
-            const nombreArchivo = hayArchivo ? escaparHTML(obtenerNombreArchivo(p)) : '';
-            const tipoArchivo = hayArchivo ? obtenerTipoArchivo(p) : '';
-            const archivoHTML = hayArchivo
-                ? `<div class="min-w-[210px]">
-                        <div class="font-semibold text-slate-700 truncate max-w-[210px]" title="${nombreArchivo}">${obtenerIconoArchivo(tipoArchivo)} ${nombreArchivo}</div>
-                        <div class="text-[10px] text-slate-500 mb-1">${tipoArchivo}</div>
-                        <button onclick="verArchivoPieza('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-md text-[11px] font-bold">👁️ Ver archivo</button>
-                    </div>`
-                : `<span class="text-slate-400">Sin archivo</span>`;
+    function cancelarEdicion() {
+        $('formPieza').reset();
+        $('editDocId').value = '';$('tituloFormulario').textContent = "Registrar nueva pieza";
+        $('estadoEdicion').classList.add('hidden');$('btnCancelarEdicion').classList.add('hidden');
+        actualizarCodigoVistaPrevia();
+    }
 
-            tbody.innerHTML += `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-2.5">${index + 1}</td>
-                    <td class="p-2.5 font-mono font-bold text-orange-700">${escaparHTML(p.codigo_pieza || '')}</td>
-                    <td class="p-2.5 font-semibold">${escaparHTML(p.nombre || '')}</td>
-                    <td class="p-2.5">${escaparHTML(p.material || '')}</td>
-                    <td class="p-2.5">${escaparHTML(p.calibre || '')}</td>
-                    <td class="p-2.5 text-center font-bold ${isBajoMin ? 'text-red-600' : ''}">${p.stock_actual}</td>
-                    <td class="p-2.5">${estadoHTML}</td>
-                    <td class="p-2.5">${archivoHTML}</td>
-                    <td class="p-2.5">
-                        <div class="flex gap-1 items-center">
-                            <button onclick="abrirDetalle('${p.id}')" class="bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded" title="Ver detalle">🔍</button>
-                            <button onclick="prepararEdicion('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded" title="Editar">✏️</button>
-                            <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded" title="Eliminar">🗑️</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
+    async function eliminarPieza(id) {
+        if (!confirm("¿Eliminar esta pieza del inventario?")) return;
+        const { error } = await supabaseClient.from('piezas').delete().eq('id', id);
+        if (error) alert("Error: " + error.message);
+        else await cargarPiezas();
     }
 
     function aplicarFiltros() {
-        const txt = $('filtroNombre').value.toUpperCase().trim();
-        const mat = $('filtroMaterial').value;
-        const cal = $('filtroCalibre').value;
-        const cat = $('filtroCategoria').value;
-        const est = $('filtroEstadoStock').value;
+        const fNom = $('filtroNombre').value.toLowerCase();
+        const fMat = $('filtroMaterial').value;
+        const fCal = $('filtroCalibre').value;
+        const fCat = $('filtroCategoria').value;
+        const fEst = $('filtroEstadoStock').value;
 
         const filtradas = piezas.filter(p => {
-            const matchTxt = !txt || String(p.nombre || '').toUpperCase().includes(txt) || String(p.codigo_pieza || '').toUpperCase().includes(txt);
-            const matchMat = mat ? p.material === mat : true;
-            const matchCal = cal ? p.calibre === cal : true;
-            const matchCat = cat ? p.categoria === cat : true;
-            
-            let matchEst = true;
-            if (est === 'BAJO') matchEst = p.stock_actual > 0 && p.stock_actual < p.stock_min;
-            if (est === 'CERO') matchEst = p.stock_actual === 0;
-            if (est === 'OK') matchEst = p.stock_actual >= p.stock_min;
+            const mNom = p.nombre.toLowerCase().includes(fNom) || p.codigo_pieza.toLowerCase().includes(fNom);
+            const mMat = !fMat || p.material === fMat;
+            const mCal = !fCal || p.calibre === fCal;
+            const mCat = !fCat || p.categoria === fCat;
+            let mEst = true;
+            if (fEst === 'BAJO') mEst = p.stock_actual <= p.stock_min && p.stock_actual > 0;
+            if (fEst === 'CERO') mEst = p.stock_actual === 0;
+            if (fEst === 'OK') mEst = p.stock_actual > p.stock_min;
 
-            return matchTxt && matchMat && matchCal && matchCat && matchEst;
+            return mNom && mMat && mCal && mCat && mEst;
         });
 
-        renderPiezas(filtradas);
+        renderTablaPiezas(filtradas);
+    }
+
+    function renderTablaPiezas(lista) {
+        $('textoResultados').textContent = `${lista.length} piezas encontradas`;
+        const tbody = $('tablaPiezasBody');
+        if (lista.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = lista.map((p, idx) => {
+            let badge = `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">OK</span>`;
+            if (p.stock_actual <= p.stock_min) badge = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Bajo Min</span>`;
+            if (p.stock_actual === 0) badge = `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">Agotado</span>`;
+
+            return `<tr class="hover:bg-slate-50">
+                <td class="p-2.5 font-mono">${idx + 1}</td>
+                <td class="p-2.5 font-bold font-mono text-orange-700">${p.codigo_pieza}</td>
+                <td class="p-2.5 font-bold">${p.nombre}</td>
+                <td class="p-2.5">${p.material}</td>
+                <td class="p-2.5">${p.calibre}</td>
+                <td class="p-2.5 text-center font-bold">${p.stock_actual} / ${p.stock_min}</td>
+                <td class="p-2.5">${badge}</td>
+                <td class="p-2.5 flex gap-1">
+                    <button onclick="verDetalle('${p.id}')" class="bg-slate-100 hover:bg-slate-200 p-1.5 rounded">👁️</button>
+                    <button onclick="editarPieza('${p.id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-1.5 rounded">✏️</button>
+                    <button onclick="eliminarPieza('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 p-1.5 rounded">🗑️</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function actualizarEstadisticas() {
+        $('statPiezas').textContent = piezas.length;
+        $('statUnidades').textContent = piezas.reduce((a, b) => a + (b.stock_actual \vert{}\vert{} 0), 0);$('statBajoMin').textContent = piezas.filter(p => p.stock_actual <= p.stock_min).length;
+    }
+
+    function actualizarSelectFiltros() {
+        const matSet = [...new Set(piezas.map(p => p.material))];
+        const calSet = [...new Set(piezas.map(p => p.calibre))];
+
+        $('filtroMaterial').innerHTML = `<option value="">Todos los materiales</option>` + matSet.map(m => `<option value="${m}">${m}</option>`).join('');
+        $('filtroCalibre').innerHTML = `<option value="">Todos los calibres</option>` + calSet.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
     function limpiarFiltros() {
@@ -780,248 +527,9 @@
         aplicarFiltros();
     }
 
-    function actualizarSelectFiltros() {
-        const materiales = [...new Set(piezas.map(p => p.material))].filter(Boolean);
-        const calibres = [...new Set(piezas.map(p => p.calibre))].filter(Boolean);
-
-        $('filtroMaterial').innerHTML = '<option value="">Todos los materiales</option>' + materiales.map(m => `<option value="${m}">${m}</option>`).join('');
-        $('filtroCalibre').innerHTML = '<option value="">Todos los calibres</option>' + calibres.map(c => `<option value="${c}">${c}</option>`).join('');
-    }
-
-    function actualizarEstadisticas() {
-        $('statPiezas').textContent = piezas.length;
-        $('statUnidades').textContent = piezas.reduce((acc, p) => acc + p.stock_actual, 0);$('statBajoMin').textContent = piezas.filter(p => p.stock_actual < p.stock_min).length;
-    }
-
-    async function eliminarPieza(id) {
-        if(!confirm("¿Estás seguro de eliminar esta pieza?")) return;
-        const pieza = piezas.find(p => p.id === id);
-        
-        try {
-            // Eliminar archivo de storage si existe
-            if(pieza && pieza.archivo_path) {
-                await supabaseClient.storage.from(SUPABASE_BUCKET).remove([pieza.archivo_path]);
-            }
-            await supabaseClient.from('piezas').delete().eq('id', id);
-            await cargarPiezas();
-        } catch (error) {
-            console.error("Error al eliminar", error);
-            alert("No se pudo eliminar.");
-        }
-    }
-
-    function prepararEdicion(id) {
-        const p = piezas.find(x => x.id === id);
-        if(!p) return;
-        
-        $('editDocId').value = p.id;
-        $('categoria').value = p.categoria || "V";
-        $('proceso').value = p.proceso_letra || "D";
-        $('nombre').value = p.nombre;
-        $('material').value = p.material;
-        $('calibre').value = p.calibre;
-        $('aplicacion').value = p.aplicacion;
-        $('stockActual').value = p.stock_actual;
-        $('stockMin').value = p.stock_min;
-        $('stockMax').value = p.stock_max;
-        $('codigoGeneradoVista').textContent = p.codigo_pieza;
-        
-        $('archivoUrlActual').value = p.archivo_url || "";
-        $('archivoPathActual').value = p.archivo_path || "";
-        $('quitarArchivo').value = "0";
-
-        $('tituloFormulario').textContent = "Editar pieza";
-        $('estadoEdicion').classList.remove('hidden');
-        $('btnCancelarEdicion').classList.remove('hidden');$('btnGuardar').textContent = "💾 Actualizar pieza";
-
-        if(p.archivo_url || p.archivo_path) {
-            $('btnQuitarArchivoExistente').classList.remove('hidden');
-            $('estadoArchivo').textContent = `Archivo: ${obtenerNombreArchivo(p)}`;
-        } else {
-            $('btnQuitarArchivoExistente').classList.add('hidden');
-        }
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function cancelarEdicion() {
-        $('formPieza').reset();$('editDocId').value = "";
-        $('archivoUrlActual').value = "";
-        $('archivoPathActual').value = "";
-        $('quitarArchivo').value = "0";
-        
-        $('tituloFormulario').textContent = "Registrar nueva pieza";
-        $('estadoEdicion').classList.add('hidden');
-        $('btnCancelarEdicion').classList.add('hidden');$('btnGuardar').textContent = "💾 Guardar pieza";
-        $('btnQuitarArchivoExistente').classList.add('hidden');
-        
-        limpiarArchivoSeleccionado();
-        actualizarCodigoVistaPrevia();
-    }
-
-    // =========================
-    // ARCHIVOS - UTILIDADES Y VISOR
-    // =========================
-    function escaparHTML(valor) {
-        return String(valor ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function obtenerNombreArchivo(p) {
-        if (!p) return 'Archivo';
-        if (p.archivo_nombre) return p.archivo_nombre;
-        const path = p.archivo_path || '';
-        const base = path.split('/').pop() || '';
-        // Archivos nuevos: 13-digitos_nombre-original.ext
-        const sinMarca = base.replace(/^\d{13}_/, '');
-        return sinMarca || base || 'Archivo asociado';
-    }
-
-    function obtenerTipoMimeDesdePieza(p) {
-        const n = String(p?.archivo_nombre || '').toLowerCase();
-        if (n.endsWith('.pdf')) return 'application/pdf';
-        if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
-        if (n.endsWith('.png')) return 'image/png';
-        if (n.endsWith('.webp')) return 'image/webp';
-        return '';
-    }
-
-    function obtenerTipoArchivo(p) {
-        if (p?.archivo_tipo) {
-            if (p.archivo_tipo === 'application/pdf') return 'PDF';
-            if (p.archivo_tipo.startsWith('image/')) return p.archivo_tipo.split('/')[1].toUpperCase();
-        }
-        const nombre = obtenerNombreArchivo(p).toLowerCase();
-        const ext = nombre.includes('.') ? nombre.split('.').pop().toUpperCase() : '';
-        return ext || 'ARCHIVO';
-    }
-
-    function obtenerIconoArchivo(tipo) {
-        if (tipo === 'PDF') return '📄';
-        if (['JPG','JPEG','PNG','WEBP'].includes(tipo)) return '🖼️';
-        return '📎';
-    }
-
-    async function obtenerUrlArchivo(p) {
-        if (!p) return null;
-
-        // Primero intentamos URL firmada a partir del path: funciona también con bucket privado.
-        if (p.archivo_path) {
-            const { data, error } = await supabaseClient.storage
-                .from(SUPABASE_BUCKET)
-                .createSignedUrl(p.archivo_path, 3600);
-            if (!error && data?.signedUrl) return data.signedUrl;
-        }
-
-        // Compatibilidad con registros antiguos que solo tengan la URL pública.
-        return p.archivo_url || null;
-    }
-
-    async function verArchivoPieza(id) {
-        const p = piezas.find(x => x.id === id);
-        if (!p || (!p.archivo_url && !p.archivo_path)) {
-            alert('Esta pieza no tiene un archivo asociado.');
-            return;
-        }
-
-        $('modalArchivo').classList.remove('hidden');
-        $('visorArchivoNombre').textContent = `${p.codigo_pieza} · ${obtenerNombreArchivo(p)}`;
-        $('visorArchivoCargando').classList.remove('hidden');
-        $('visorArchivoPDF').classList.add('hidden');
-        $('visorArchivoIMG').classList.add('hidden');
-        $('visorArchivoError').classList.add('hidden');
-        $('visorArchivoPDF').src = '';
-        $('visorArchivoIMG').src = '';
-        $('btnAbrirArchivoPestana').onclick = () => abrirArchivoNuevaPestana(id);
-
-        try {
-            const url = await obtenerUrlArchivo(p);
-            if (!url) throw new Error('No se pudo obtener la URL del archivo.');
-
-            $('visorArchivoCargando').classList.add('hidden');
-            const tipo = obtenerTipoArchivo(p);
-            if (tipo === 'PDF') {
-                $('visorArchivoPDF').src = url;
-                $('visorArchivoPDF').classList.remove('hidden');
-            } else {
-                $('visorArchivoIMG').src = url;
-                $('visorArchivoIMG').classList.remove('hidden');
-            }
-            $('btnAbrirArchivoPestana').onclick = () => window.open(url, '_blank', 'noopener');
-        } catch (error) {
-            console.error(error);
-            $('visorArchivoCargando').classList.add('hidden');
-            $('visorArchivoError').textContent = 'No fue posible cargar el archivo. Verifica que el objeto exista en el bucket "planos" y que las políticas de Storage permitan lectura.';
-            $('visorArchivoError').classList.remove('hidden');
-        }
-    }
-
-    async function abrirArchivoNuevaPestana(id) {
-        const p = piezas.find(x => x.id === id);
-        if (!p) return;
-        try {
-            const url = await obtenerUrlArchivo(p);
-            if (!url) return alert('No existe un archivo asociado.');
-            window.open(url, '_blank', 'noopener');
-        } catch (error) {
-            console.error(error);
-            alert('No fue posible abrir el archivo.');
-        }
-    }
-
-    function cerrarVisorArchivo() {
-        $('modalArchivo').classList.add('hidden');
-        $('visorArchivoPDF').src = '';
-        $('visorArchivoIMG').src = '';
-    }
-
-    // =========================
-    // VISOR DE ARCHIVOS
-    // =========================
-    function previsualizarArchivo(e) {
-        const file = e.target.files[0];
-        if(!file) return limpiarArchivoSeleccionado();
-        
-        $('estadoArchivo').textContent = `Seleccionado: ${file.name}`;
-        $('quitarArchivo').value = "0";
-        $('btnQuitarArchivoExistente').classList.add('hidden');
-
-        if(previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
-        previewObjectUrl = URL.createObjectURL(file);
-
-        $('textoVisorVacio').classList.add('hidden');
-        if(file.type === 'application/pdf') {
-            $('pdfVisor').src = previewObjectUrl;
-            $('pdfVisor').classList.remove('hidden');$('imgVisor').classList.add('hidden');
-        } else if(file.type.startsWith('image/')) {
-            $('imgVisor').src = previewObjectUrl;
-            $('imgVisor').classList.remove('hidden');$('pdfVisor').classList.add('hidden');
-        }
-    }
-
-    function limpiarArchivoSeleccionado() {
-        $('archivoPlano').value = '';
-        if(previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
-        $('pdfVisor').classList.add('hidden');$('imgVisor').classList.add('hidden');
-        $('textoVisorVacio').classList.remove('hidden');$('estadoArchivo').textContent = "Sin archivo";
-    }
-
-    function quitarArchivoExistente() {
-        $('quitarArchivo').value = "1";
-        $('btnQuitarArchivoExistente').classList.add('hidden');$('estadoArchivo').textContent = "Archivo eliminado (se aplicará al guardar)";
-        limpiarArchivoSeleccionado();
-    }
-
-    // =========================
-    // LÓGICA DE SOLICITUDES
-    // =========================
+    // SOLICITUDES
     async function cargarSolicitudes() {
-        if (!window.supabaseReady) return;
-        const { data, error } = await supabaseClient.from('solicitudes_piezas').select('*').order('fecha_solicitud', { ascending: false });
+        const { data, error } = await supabaseClient.from('solicitudes').select('*').order('created_at', { ascending: false });
         if (error) return console.error(error);
         solicitudes = data || [];
         $('statSolicitudes').textContent = solicitudes.filter(s => s.estado === 'Pendiente').length;
@@ -1029,24 +537,14 @@
     }
 
     function actualizarSelectPiezas() {
-        const select = $('solicitudPieza');
-        select.innerHTML = '<option value="">Selecciona una pieza</option>';
-        piezas.forEach(p => {
-            select.innerHTML += `<option value="${p.id}">${p.codigo_pieza} - ${p.nombre}</option>`;
-        });
+        $('solicitudPieza').innerHTML = `<option value="">Selecciona una pieza</option>` +
+            piezas.map(p => `<option value="${p.codigo_pieza}">${p.codigo_pieza} - ${p.nombre}</option>`).join('');
     }
 
     async function guardarSolicitud(e) {
         e.preventDefault();
-        const piezaId = $('solicitudPieza').value;
-        const pieza = piezas.find(p => p.id === piezaId);
-        if(!pieza) return;
-
         const payload = {
-            pieza_id: piezaId,
-            pieza_nombre: pieza.nombre,
-            codigo_pieza: pieza.codigo_pieza,
-            nombre_pieza: pieza.nombre,
+            pieza_codigo: $('solicitudPieza').value,
             cantidad: parseInt($('solicitudCantidad').value),
             prioridad: $('solicitudPrioridad').value,
             solicitante: $('solicitudSolicitante').value,
@@ -1054,245 +552,85 @@
             estado: 'Pendiente'
         };
 
-        try {
-            await supabaseClient.from('solicitudes_piezas').insert([payload]);
+        const { error } = await supabaseClient.from('solicitudes').insert([payload]);
+        if (error) alert("Error: " + error.message);
+        else {
             $('formSolicitud').reset();
             await cargarSolicitudes();
-            alert("Solicitud creada exitosamente.");
-        } catch (error) {
-            console.error(error);
-            alert("Error al crear solicitud.");
         }
     }
 
     function renderSolicitudes() {
-        const filtro = $('filtroSolicitudEstado').value;
+        const fil = $('filtroSolicitudEstado').value;
+        const lista = fil ? solicitudes.filter(s => s.estado === fil) : solicitudes;
         const tbody = $('tablaSolicitudesBody');
-        tbody.innerHTML = '';
-        
-        let datos = solicitudes;
-        if(filtro) datos = datos.filter(s => s.estado === filtro);
 
-        if(datos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-500">No hay solicitudes.</td></tr>`;
+        if (lista.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400">Sin solicitudes.</td></tr>`;
             return;
         }
 
-        datos.forEach(s => {
-            let colorPrioridad = 'text-slate-600';
-            if (s.prioridad === 'Alta') colorPrioridad = 'text-orange-600 font-bold';
-            if (s.prioridad === 'Urgente') colorPrioridad = 'text-red-600 font-bold';
-
-            tbody.innerHTML += `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-2.5">${fechaTexto(s.fecha_solicitud)}</td>
-                    <td class="p-2.5 font-bold">${s.codigo_pieza} <span class="font-normal text-xs block">${s.nombre_pieza}</span></td>
-                    <td class="p-2.5">${s.cantidad}</td>
-                    <td class="p-2.5 ${colorPrioridad}">${s.prioridad}</td>
-                    <td class="p-2.5">${s.solicitante}</td>
-                    <td class="p-2.5">
-                        <select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded p-1 text-xs">
-                            <option value="Pendiente" ${s.estado==='Pendiente'?'selected':''}>Pendiente</option>
-                            <option value="En proceso" ${s.estado==='En proceso'?'selected':''}>En proceso</option>
-                            <option value="Completada" ${s.estado==='Completada'?'selected':''}>Completada</option>
-                            <option value="Cancelada" ${s.estado==='Cancelada'?'selected':''}>Cancelada</option>
-                        </select>
-                    </td>
-                    <td class="p-2.5 truncate max-w-[150px]" title="${s.motivo || ''}">${s.motivo || '—'}</td>
-                </tr>
-            `;
-        });
+        tbody.innerHTML = lista.map(s => `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2.5 text-[11px]">${new Date(s.created_at || Date.now()).toLocaleDateString()}</td>
+                <td class="p-2.5 font-bold font-mono text-orange-700">${s.pieza_codigo}</td>
+                <td class="p-2.5 text-center font-bold">${s.cantidad}</td>
+                <td class="p-2.5">${s.prioridad}</td>
+                <td class="p-2.5">${s.solicitante}</td>
+                <td class="p-2.5">
+                    <span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full text-[10px] font-bold">${s.estado}</span>
+                </td>
+            </tr>
+        `).join('');
     }
 
-    async function cambiarEstadoSolicitud(id, nuevoEstado) {
-        try {
-            await supabaseClient.from('solicitudes_piezas').update({ estado: nuevoEstado }).eq('id', id);
-            await cargarSolicitudes();
-        } catch(error) {
-            console.error(error);
-        }
-    }
-
-    // =========================
-    // MODAL DETALLE
-    // =========================
-    function abrirDetalle(id) {
+    // MODALES & QR
+    function verDetalle(id) {
         const p = piezas.find(x => x.id === id);
-        if(!p) return;
-        piezaDetalleActual = p;
-
-        $('detalleCodigo').textContent = p.codigo_pieza;
+        if (!p) return;
         $('dNombre').textContent = p.nombre;
         $('dMaterial').textContent = p.material;
         $('dCalibre').textContent = p.calibre;
-        $('dAplicacion').textContent = p.aplicacion || "—";
-        $('dStock').textContent = `${p.stock_actual} (Mín: ${p.stock_min} / Máx: ${p.stock_max})`;
-        
-        let estado = "OK";
-        if (p.stock_actual === 0) estado = "AGOTADO";
-        else if (p.stock_actual < p.stock_min) estado = "BAJO MÍNIMO";
-        $('dEstado').textContent = estado;
+        $('dAplicacion').textContent = p.aplicacion \vert{}\vert{} '—';$('dStock').textContent = `${p.stock_actual} unidades`;
+        $('detalleCodigo').textContent = p.codigo_pieza;
 
-        // Limpiar QR/Barcode previos
         $('qrDetalle').innerHTML = '';
-        
-        // Generar QR
-        new QRCode($('qrDetalle'), {
-            text: p.codigo_pieza,
-            width: 128,
-            height: 128,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
-        });
+        new QRCode($('qrDetalle'), { text: p.codigo_pieza, width: 120, height: 120 });
 
-        // Generar Barcode
-        JsBarcode("#barcodeDetalle", p.codigo_pieza, {
-            format: "CODE128",
-            lineColor: "#0f172a",
-            width: 2,
-            height: 50,
-            displayValue: true
-        });
-
-        // Archivo asociado
-        if (p.archivo_url || p.archivo_path) {
-            const nombreArchivo = escaparHTML(obtenerNombreArchivo(p));
-            const tipoArchivo = obtenerTipoArchivo(p);
-            $('detalleArchivo').innerHTML = `
-                <div class="font-bold text-sm mb-2">Archivo asociado</div>
-                <div class="bg-slate-50 border rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div>
-                        <div class="font-semibold text-slate-800">${obtenerIconoArchivo(tipoArchivo)} ${nombreArchivo}</div>
-                        <div class="text-xs text-slate-500 mt-1">Tipo: ${tipoArchivo}</div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="verArchivoPieza('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-sm">👁️ Ver archivo</button>
-                        <button onclick="abrirArchivoNuevaPestana('${p.id}')" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-lg font-semibold text-sm">↗ Nueva pestaña</button>
-                    </div>
-                </div>
-            `;
-        } else {
-            $('detalleArchivo').innerHTML = `<div class="text-slate-500 text-sm">No hay archivo asociado a esta pieza.</div>`;
-        }
-
-        // Acciones botones
-        $('btnDetalleEditar').onclick = () => { cerrarDetalle(); prepararEdicion(p.id); };$('btnDetalleSolicitud').onclick = () => {
-            cerrarDetalle();
-            mostrarSeccion('solicitudes');
-            $('solicitudPieza').value = p.id;
-            $('solicitudCantidad').focus();
-        };
-
-        $('modalDetalle').classList.remove('hidden');
+        $('btnDetalleEditar').onclick = () => { cerrarDetalle(); editarPieza(p.id); };$('modalDetalle').classList.remove('hidden');
     }
 
-    function cerrarDetalle() {
-        $('modalDetalle').classList.add('hidden');
-    }
+    function cerrarDetalle() { $('modalDetalle').classList.add('hidden'); }
 
-    // =========================
-    // ESCÁNER
-    // =========================
     function abrirEscaner() {
         $('modalEscaner').classList.remove('hidden');
-        $('mensajeEscaner').textContent = '';$('codigoManual').value = '';
-        
-        Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length) {
-                const sel = $('camaraSelect');
-                sel.innerHTML = '';
-                devices.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.label}</option>` });
-            } else {
-                $('camaraSelect').innerHTML = '<option value="">Sin cámaras disponibles</option>';
-            }
+        escaner = new Html5Qrcode("reader");
+        escaner.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (texto) => {
+            detenerCamara();
+            cerrarEscaner();
+            const p = piezas.find(x => x.codigo_pieza === texto);
+            if (p) verDetalle(p.id);
+            else alert("Pieza no encontrada: " + texto);
         }).catch(err => console.error(err));
     }
 
-    function cerrarEscaner() {
-        detenerCamara();
-        $('modalEscaner').classList.add('hidden');
-    }
+    function detenerCamara() { if (escaner) escaner.stop(); }
+    function cerrarEscaner() { detenerCamara(); $('modalEscaner').classList.add('hidden'); }
 
-    function iniciarCamara() {
-        if(escanerActivo) return;
-        const camId = $('camaraSelect').value;
-        if(!camId) return alert("Selecciona una cámara");
-
-        escaner = new Html5Qrcode("reader");
-        escaner.start(
-            camId, 
-            { fps: 10, qrbox: {width: 250, height: 250} },
-            (decodedText, decodedResult) => {
-                detenerCamara();
-                cerrarEscaner();
-                buscarPorCodigo(decodedText);
-            },
-            (errorMessage) => { /* Ignorar errores de escaneo continuo */ }
-        ).then(() => {
-            escanerActivo = true;
-        }).catch(err => {
-            console.log(err);
-            $('mensajeEscaner').textContent = "Error al iniciar cámara. " + err;
-        });
-    }
-
-    function detenerCamara() {
-        if(escaner && escanerActivo) {
-            escaner.stop().then(() => { escanerActivo = false; }).catch(err => console.error(err));
-        }
-    }
-
-    function buscarCodigoManual() {
-        const cod = $('codigoManual').value.trim().toUpperCase();
-        if(!cod) return;
-        cerrarEscaner();
-        buscarPorCodigo(cod);
-    }
-
-    function buscarPorCodigo(codigoBuscado) {
-        const pieza = piezas.find(p => p.codigo_pieza === codigoBuscado);
-        if(pieza) {
-            mostrarSeccion('inventario');
-            abrirDetalle(pieza.id);
-        } else {
-            alert("No se encontró ninguna pieza con el código: " + codigoBuscado);
-        }
-    }
-
-    // =========================
-    // GENERACIÓN PDF
-    // =========================
+    // PDF
     function descargarInventarioPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        
-        doc.setFontSize(16);
-        doc.text("VOLMEX - Inventario de Piezas", 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 22);
+        doc.text("Reporte de Inventario - VOLMEX", 14, 15);
 
-        const columns = ["Código", "Nombre", "Mat.", "Calibre", "Stock", "Mín"];
-        const rows = piezas.map(p => [
-            p.codigo_pieza, 
-            p.nombre.substring(0, 20), 
-            p.material, 
-            p.calibre, 
-            p.stock_actual.toString(), 
-            p.stock_min.toString()
-        ]);
-
+        const data = piezas.map((p, i) => [i + 1, p.codigo_pieza, p.nombre, p.material, p.calibre, p.stock_actual]);
         doc.autoTable({
-            startY: 28,
-            head: [columns],
-            body: rows,
-            theme: 'grid',
-            headStyles: { fillColor: [234, 88, 12] } // Naranja VOLMEX
+            head: [['#', 'Código', 'Nombre', 'Material', 'Calibre', 'Stock']],
+            body: data,
+            startY: 20
         });
-
-        doc.save(`Inventario_VOLMEX_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save("inventario_volmex.pdf");
     }
-
 </script>
 </body>
 </html>
