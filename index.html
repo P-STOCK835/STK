@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VOLMEX - Control y Clasificación de Piezas</title>
+    <title>VOLMEX - Estandarización y Control de Piezas</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Firebase Web SDK (compat para simplificar la integración en un solo HTML) -->
+    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-storage-compat.js"></script>
+
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -20,20 +26,16 @@
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
             <h1 class="text-2xl font-extrabold tracking-wide">VOLMEX</h1>
-            <p class="text-xs text-orange-100">Control, clasificación y reposición de piezas en stock</p>
+            <p class="text-xs text-orange-100">Estandarización, control y trazabilidad de piezas en stock</p>
         </div>
 
-        <span id="estadoConexion" class="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">Conectando con Supabase...</span>
+        <span id="estadoConexion" class="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">Conectando con Firebase...</span>
+
         <div class="flex flex-wrap gap-2">
-            <button onclick="mostrarSeccion('inventario')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">
-                📦 Inventario
-            </button>
-            <button onclick="mostrarSeccion('solicitudes')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">
-                📝 Solicitudes
-            </button>
-            <button onclick="abrirEscaner()" class="bg-white text-orange-700 hover:bg-orange-50 px-3 py-2 rounded-lg text-sm font-bold shadow">
-                📷 Escanear
-            </button>
+            <button onclick="mostrarSeccion('inventario')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">📦 Inventario</button>
+            <button onclick="mostrarSeccion('solicitudes')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">📝 Solicitudes</button>
+            <button onclick="mostrarSeccion('movimientos')" class="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg text-sm font-semibold">🔄 Movimientos</button>
+            <button onclick="abrirEscaner()" class="bg-white text-orange-700 hover:bg-orange-50 px-3 py-2 rounded-lg text-sm font-bold shadow">📷 Escanear</button>
         </div>
     </div>
 </header>
@@ -42,7 +44,7 @@
 
     <!-- INDICADORES -->
     <section id="seccionInventario">
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
             <div class="bg-white rounded-xl shadow p-4">
                 <div class="text-xs text-slate-500">Piezas registradas</div>
                 <div id="statPiezas" class="text-2xl font-extrabold mt-1">0</div>
@@ -52,8 +54,12 @@
                 <div id="statUnidades" class="text-2xl font-extrabold mt-1">0</div>
             </div>
             <div class="bg-white rounded-xl shadow p-4">
-                <div class="text-xs text-slate-500">Piezas bajo mínimo</div>
+                <div class="text-xs text-slate-500">Bajo mínimo</div>
                 <div id="statBajoMin" class="text-2xl font-extrabold mt-1 text-red-600">0</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="text-xs text-slate-500">Sin stock</div>
+                <div id="statSinStock" class="text-2xl font-extrabold mt-1 text-red-700">0</div>
             </div>
             <div class="bg-white rounded-xl shadow p-4">
                 <div class="text-xs text-slate-500">Solicitudes pendientes</div>
@@ -68,13 +74,12 @@
                 <div class="flex items-center justify-between border-b pb-3 mb-4">
                     <div>
                         <h2 id="tituloFormulario" class="font-bold text-lg">Registrar nueva pieza</h2>
-                        <p class="text-xs text-slate-500">Los datos se guardan en Supabase.</p>
+                        <p class="text-xs text-slate-500">Los datos se guardan en Firestore y los archivos en Firebase Storage.</p>
                     </div>
                     <span id="estadoEdicion" class="hidden text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">EDITANDO</span>
                 </div>
 
                 <form id="formPieza" onsubmit="guardarPieza(event)" class="space-y-3 text-sm">
-
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block font-semibold mb-1">Categoría</label>
@@ -96,8 +101,9 @@
                     </div>
 
                     <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                        <div class="text-xs font-semibold text-orange-700">Código de pieza</div>
+                        <div class="text-xs font-semibold text-orange-700">Código estandarizado</div>
                         <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VD-P-001</div>
+                        <div class="text-[11px] text-orange-700 mt-1">El consecutivo lo administra Firebase para evitar duplicados.</div>
                     </div>
 
                     <div>
@@ -112,13 +118,41 @@
                         </div>
                         <div>
                             <label class="block font-semibold mb-1">Calibre / espesor</label>
-                            <input type="text" id="calibre" placeholder="Ej. 3/16, 10 mm..." class="w-full border rounded-lg p-2.5" required>
+                            <input type="text" id="calibre" placeholder="Ej. 3/16, 10 mm" class="w-full border rounded-lg p-2.5" required>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1">Unidad de medida</label>
+                            <select id="unidad" class="w-full border rounded-lg p-2.5">
+                                <option value="pieza">Pieza</option>
+                                <option value="juego">Juego</option>
+                                <option value="par">Par</option>
+                                <option value="metro">Metro</option>
+                                <option value="kg">Kilogramo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Ubicación en almacén</label>
+                            <input type="text" id="ubicacion" placeholder="Ej. Rack A-03" class="w-full border rounded-lg p-2.5">
                         </div>
                     </div>
 
                     <div>
                         <label class="block font-semibold mb-1">Aplicación principal</label>
                         <input type="text" id="aplicacion" placeholder="Ej. Bastidor, suspensión, tanque..." class="w-full border rounded-lg p-2.5">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold mb-1">Proveedor / fabricante</label>
+                            <input type="text" id="proveedor" class="w-full border rounded-lg p-2.5" placeholder="Opcional">
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">No. de plano</label>
+                            <input type="text" id="numeroPlano" class="w-full border rounded-lg p-2.5" placeholder="Ej. PL-0258">
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-2">
@@ -136,15 +170,23 @@
                         </div>
                     </div>
 
+                    <div>
+                        <label class="block font-semibold mb-1">Descripción / observaciones</label>
+                        <textarea id="descripcion" rows="3" class="w-full border rounded-lg p-2.5" placeholder="Características, medidas, observaciones o criterios de estandarización..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Archivo asociado</label>
+                        <input type="file" id="archivoPieza" accept=".pdf,.dwg,.dxf,.step,.stp,.iges,.igs,.sldprt,.jpg,.jpeg,.png,.webp" class="w-full border rounded-lg p-2 text-xs bg-slate-50">
+                        <div id="archivoActual" class="text-[11px] text-slate-500 mt-1"></div>
+                    </div>
+
                     <input type="hidden" id="editDocId" value="">
+                    <input type="hidden" id="editArchivoPath" value="">
 
                     <div class="flex gap-2 pt-2">
-                        <button type="submit" id="btnGuardar" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow">
-                            💾 Guardar pieza
-                        </button>
-                        <button type="button" id="btnCancelarEdicion" onclick="cancelarEdicion()" class="hidden bg-slate-200 hover:bg-slate-300 px-4 rounded-lg font-semibold">
-                            Cancelar
-                        </button>
+                        <button type="submit" id="btnGuardar" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow">💾 Guardar pieza</button>
+                        <button type="button" id="btnCancelarEdicion" onclick="cancelarEdicion()" class="hidden bg-slate-200 hover:bg-slate-300 px-4 rounded-lg font-semibold">Cancelar</button>
                     </div>
                 </form>
             </section>
@@ -153,31 +195,24 @@
             <section class="xl:col-span-8 bg-white rounded-xl shadow-md p-5">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b pb-4 mb-4">
                     <div>
-                        <h2 class="font-bold text-lg">Inventario de piezas</h2>
-                        <p class="text-xs text-slate-500">Busca, filtra, edita, elimina, escanea o genera PDF.</p>
+                        <h2 class="font-bold text-lg">Inventario estandarizado</h2>
+                        <p class="text-xs text-slate-500">Busca por código, nombre, material, ubicación, plano o aplicación.</p>
                     </div>
-                    <button onclick="descargarInventarioPDF()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold">
-                        📄 Descargar inventario PDF
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="descargarInventarioPDF()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold">📄 PDF</button>
+                    </div>
                 </div>
 
-                <!-- FILTROS -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
-                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Nombre o código..." class="border rounded-lg p-2.5 text-sm">
-                    <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
-                        <option value="">Todos los materiales</option>
-                    </select>
-                    <select id="filtroCalibre" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
-                        <option value="">Todos los calibres</option>
-                    </select>
+                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Código o nombre..." class="border rounded-lg p-2.5 text-sm">
+                    <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm"><option value="">Todos los materiales</option></select>
+                    <select id="filtroCalibre" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm"><option value="">Todos los calibres</option></select>
                     <select id="filtroCategoria" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
                         <option value="">Todas las categorías</option>
+                        <option value="V">Volteo</option><option value="L">Lowboy</option><option value="G">Góndola</option><option value="X">Genérico</option>
                     </select>
                     <select id="filtroEstadoStock" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
-                        <option value="">Todo el stock</option>
-                        <option value="BAJO">Bajo mínimo</option>
-                        <option value="OK">Stock normal</option>
-                        <option value="CERO">Sin stock</option>
+                        <option value="">Todo el stock</option><option value="BAJO">Bajo mínimo</option><option value="OK">Stock normal</option><option value="CERO">Sin stock</option>
                     </select>
                 </div>
 
@@ -187,22 +222,13 @@
                 </div>
 
                 <div class="overflow-x-auto border rounded-lg">
-                    <table class="w-full text-xs text-left min-w-[850px]">
+                    <table class="w-full text-xs text-left min-w-[1100px]">
                         <thead>
                             <tr class="bg-slate-100 text-slate-700 border-b">
-                                <th class="p-2.5">No.</th>
-                                <th class="p-2.5">Código</th>
-                                <th class="p-2.5">Nombre</th>
-                                <th class="p-2.5">Material</th>
-                                <th class="p-2.5">Calibre</th>
-                                <th class="p-2.5 text-center">Stock</th>
-                                <th class="p-2.5">Estado</th>
-                                <th class="p-2.5">Acciones</th>
+                                <th class="p-2.5">No.</th><th class="p-2.5">Código</th><th class="p-2.5">Nombre</th><th class="p-2.5">Material</th><th class="p-2.5">Calibre</th><th class="p-2.5">Ubicación</th><th class="p-2.5 text-center">Stock</th><th class="p-2.5">Archivo</th><th class="p-2.5">Estado</th><th class="p-2.5">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaPiezasBody" class="divide-y">
-                            <tr><td colspan="8" class="p-5 text-center text-slate-400">Cargando...</td></tr>
-                        </tbody>
+                        <tbody id="tablaPiezasBody" class="divide-y"><tr><td colspan="10" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -217,420 +243,772 @@
                 <form id="formSolicitud" onsubmit="guardarSolicitud(event)" class="space-y-3 text-sm">
                     <div>
                         <label class="block font-semibold mb-1">Pieza</label>
-                        <select id="solicitudPieza" class="w-full border rounded-lg p-2.5" required>
-                            <option value="">Selecciona una pieza</option>
-                        </select>
+                        <select id="solicitudPieza" class="w-full border rounded-lg p-2.5" required><option value="">Selecciona una pieza</option></select>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block font-semibold mb-1">Cantidad</label>
-                            <input type="number" id="solicitudCantidad" min="1" value="1" class="w-full border rounded-lg p-2.5" required>
-                        </div>
-                        <div>
-                            <label class="block font-semibold mb-1">Prioridad</label>
-                            <select id="solicitudPrioridad" class="w-full border rounded-lg p-2.5">
-                                <option value="Normal">Normal</option>
-                                <option value="Alta">Alta</option>
-                                <option value="Urgente">Urgente</option>
-                            </select>
-                        </div>
+                        <div><label class="block font-semibold mb-1">Cantidad</label><input type="number" id="solicitudCantidad" min="1" value="1" class="w-full border rounded-lg p-2.5" required></div>
+                        <div><label class="block font-semibold mb-1">Prioridad</label><select id="solicitudPrioridad" class="w-full border rounded-lg p-2.5"><option value="Normal">Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente</option></select></div>
                     </div>
-                    <div>
-                        <label class="block font-semibold mb-1">Solicita</label>
-                        <input type="text" id="solicitudSolicitante" placeholder="Nombre del responsable" class="w-full border rounded-lg p-2.5" required>
-                    </div>
-                    <div>
-                        <label class="block font-semibold mb-1">Motivo / comentario</label>
-                        <textarea id="solicitudMotivo" rows="4" placeholder="Ej. Se agotó la pieza y hay producción programada..." class="w-full border rounded-lg p-2.5"></textarea>
-                    </div>
-                    <button type="submit" id="btnSolicitud" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">
-                        📝 Crear solicitud
-                    </button>
+                    <div><label class="block font-semibold mb-1">Solicita</label><input type="text" id="solicitudSolicitante" placeholder="Nombre del responsable" class="w-full border rounded-lg p-2.5" required></div>
+                    <div><label class="block font-semibold mb-1">Motivo / comentario</label><textarea id="solicitudMotivo" rows="4" placeholder="Ej. Se agotó la pieza y hay producción programada..." class="w-full border rounded-lg p-2.5"></textarea></div>
+                    <button type="submit" id="btnSolicitud" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">📝 Crear solicitud</button>
                 </form>
             </section>
 
             <section class="lg:col-span-7 bg-white rounded-xl shadow-md p-5">
                 <div class="flex items-center justify-between border-b pb-3 mb-4">
-                    <div>
-                        <h2 class="font-bold text-lg">Solicitudes de piezas</h2>
-                        <p class="text-xs text-slate-500">Aquí puedes cambiar el estado de cada solicitud.</p>
-                    </div>
-                    <select id="filtroSolicitudEstado" onchange="renderSolicitudes()" class="border rounded-lg p-2 text-xs">
-                        <option value="">Todas</option>
-                        <option value="Pendiente">Pendientes</option>
-                        <option value="En proceso">En proceso</option>
-                        <option value="Completada">Completadas</option>
-                        <option value="Cancelada">Canceladas</option>
-                    </select>
+                    <div><h2 class="font-bold text-lg">Solicitudes de piezas</h2><p class="text-xs text-slate-500">Actualiza el estado y conserva la trazabilidad de abastecimiento.</p></div>
+                    <select id="filtroSolicitudEstado" onchange="renderSolicitudes()" class="border rounded-lg p-2 text-xs"><option value="">Todas</option><option value="Pendiente">Pendientes</option><option value="En proceso">En proceso</option><option value="Completada">Completadas</option><option value="Cancelada">Canceladas</option></select>
                 </div>
-
                 <div class="overflow-x-auto border rounded-lg">
-                    <table class="w-full text-xs text-left min-w-[700px]">
-                        <thead>
-                            <tr class="bg-slate-100 border-b">
-                                <th class="p-2.5">Fecha</th>
-                                <th class="p-2.5">Pieza</th>
-                                <th class="p-2.5">Cantidad</th>
-                                <th class="p-2.5">Prioridad</th>
-                                <th class="p-2.5">Solicita</th>
-                                <th class="p-2.5">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaSolicitudesBody" class="divide-y">
-                            <tr><td colspan="6" class="p-5 text-center text-slate-400">Cargando...</td></tr>
-                        </tbody>
+                    <table class="w-full text-xs text-left min-w-[850px]">
+                        <thead><tr class="bg-slate-100 border-b"><th class="p-2.5">Fecha</th><th class="p-2.5">Pieza</th><th class="p-2.5">Cantidad</th><th class="p-2.5">Prioridad</th><th class="p-2.5">Solicita</th><th class="p-2.5">Estado</th></tr></thead>
+                        <tbody id="tablaSolicitudesBody" class="divide-y"><tr><td colspan="6" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </section>
         </div>
     </section>
+
+    <!-- MOVIMIENTOS -->
+    <section id="seccionMovimientos" class="hidden">
+        <section class="bg-white rounded-xl shadow-md p-5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b pb-3 mb-4">
+                <div><h2 class="font-bold text-lg">Movimientos de stock</h2><p class="text-xs text-slate-500">Entradas, salidas y ajustes para conservar el historial de inventario.</p></div>
+                <button onclick="abrirMovimiento()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-bold">➕ Registrar movimiento</button>
+            </div>
+            <div class="overflow-x-auto border rounded-lg">
+                <table class="w-full text-xs text-left min-w-[900px]">
+                    <thead><tr class="bg-slate-100 border-b"><th class="p-2.5">Fecha</th><th class="p-2.5">Pieza</th><th class="p-2.5">Tipo</th><th class="p-2.5">Cantidad</th><th class="p-2.5">Stock resultante</th><th class="p-2.5">Responsable</th><th class="p-2.5">Motivo</th></tr></thead>
+                    <tbody id="tablaMovimientosBody" class="divide-y"><tr><td colspan="7" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+    </section>
 </main>
+
+<!-- MODAL MOVIMIENTO -->
+<div id="modalMovimiento" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b pb-3 mb-4"><h3 class="font-bold text-lg">Registrar movimiento</h3><button onclick="cerrarMovimiento()" class="text-slate-500 text-2xl">×</button></div>
+            <form onsubmit="guardarMovimiento(event)" class="space-y-3 text-sm">
+                <div><label class="block font-semibold mb-1">Pieza</label><select id="movPieza" required class="w-full border rounded-lg p-2.5"><option value="">Selecciona una pieza</option></select></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block font-semibold mb-1">Tipo</label><select id="movTipo" class="w-full border rounded-lg p-2.5"><option value="ENTRADA">Entrada</option><option value="SALIDA">Salida</option><option value="AJUSTE">Ajuste absoluto</option></select></div>
+                    <div><label class="block font-semibold mb-1">Cantidad</label><input id="movCantidad" type="number" min="1" value="1" required class="w-full border rounded-lg p-2.5"></div>
+                </div>
+                <div><label class="block font-semibold mb-1">Responsable</label><input id="movResponsable" required class="w-full border rounded-lg p-2.5" placeholder="Nombre del responsable"></div>
+                <div><label class="block font-semibold mb-1">Motivo</label><textarea id="movMotivo" rows="3" class="w-full border rounded-lg p-2.5" placeholder="Producción, compra, consumo, corrección de inventario..."></textarea></div>
+                <button class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">💾 Guardar movimiento</button>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL ESCÁNER -->
 <div id="modalEscaner" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
-    <div class="min-h-full flex items-center justify-center">
-        <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
-            <div class="flex items-center justify-between mb-3">
-                <h3 class="font-bold text-lg">Escanear código QR</h3>
-                <button onclick="cerrarEscaner()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
-            </div>
-            <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[200px]"></div>
-            <div class="mt-3 flex gap-2">
-                <button onclick="detenerCamara()" class="flex-1 bg-slate-200 hover:bg-slate-300 rounded-lg py-2 text-xs font-semibold">⏹ Detener</button>
-                <button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-2 text-xs font-semibold">Cerrar</button>
-            </div>
-        </div>
-    </div>
+    <div class="min-h-full flex items-center justify-center"><div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
+        <div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Escanear código QR</h3><button onclick="cerrarEscaner()" class="text-slate-500 text-2xl">×</button></div>
+        <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[200px]"></div>
+        <div class="mt-3 flex gap-2"><button onclick="detenerCamara()" class="flex-1 bg-slate-200 rounded-lg py-2 text-xs font-semibold">⏹ Detener</button><button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 text-white rounded-lg py-2 text-xs font-semibold">Cerrar</button></div>
+    </div></div>
 </div>
 
-<!-- MODAL DETALLE / QR -->
+<!-- MODAL DETALLE -->
 <div id="modalDetalle" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
-    <div class="min-h-full flex items-center justify-center">
-        <div class="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl">
-            <div class="flex items-center justify-between border-b pb-3">
-                <div>
-                    <h3 id="detalleTitulo" class="font-bold text-xl">Detalle de pieza</h3>
-                    <div id="detalleCodigo" class="font-mono text-orange-700 font-extrabold mt-1"></div>
-                </div>
-                <button onclick="cerrarDetalle()" class="text-slate-500 hover:text-slate-900 text-2xl">×</button>
+    <div class="min-h-full flex items-center justify-center"><div class="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl">
+        <div class="flex items-center justify-between border-b pb-3"><div><h3 id="detalleTitulo" class="font-bold text-xl">Detalle de pieza</h3><div id="detalleCodigo" class="font-mono text-orange-700 font-extrabold mt-1"></div></div><button onclick="cerrarDetalle()" class="text-slate-500 text-2xl">×</button></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 text-sm">
+            <div class="space-y-2">
+                <div class="bg-slate-50 p-2 rounded"><b>Nombre:</b> <span id="dNombre"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Material:</b> <span id="dMaterial"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Calibre:</b> <span id="dCalibre"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Aplicación:</b> <span id="dAplicacion"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Ubicación:</b> <span id="dUbicacion"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Proveedor:</b> <span id="dProveedor"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>No. plano:</b> <span id="dPlano"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Stock:</b> <span id="dStock"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Descripción:</b> <span id="dDescripcion"></span></div>
+                <div class="bg-slate-50 p-2 rounded"><b>Archivo:</b> <span id="dArchivoNombre"></span></div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 text-sm">
-                <div class="space-y-2">
-                    <div class="bg-slate-50 p-2 rounded"><b>Nombre:</b> <span id="dNombre"></span></div>
-                    <div class="bg-slate-50 p-2 rounded"><b>Material:</b> <span id="dMaterial"></span></div>
-                    <div class="bg-slate-50 p-2 rounded"><b>Calibre:</b> <span id="dCalibre"></span></div>
-                    <div class="bg-slate-50 p-2 rounded"><b>Aplicación:</b> <span id="dAplicacion"></span></div>
-                    <div class="bg-slate-50 p-2 rounded"><b>Stock actual:</b> <span id="dStock"></span></div>
-                </div>
-                <div class="border rounded-xl p-3 text-center flex flex-col items-center justify-center">
-                    <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div>
-                    <div id="qrDetalle"></div>
-                </div>
-            </div>
-            <div class="flex gap-2 border-t pt-3">
-                <button id="btnDetalleEditar" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">✏️ Editar</button>
-                <button onclick="cerrarDetalle()" class="bg-slate-200 rounded-lg px-4 py-2 text-xs font-semibold ml-auto">Cerrar</button>
+            <div class="border rounded-xl p-3 text-center flex flex-col items-center justify-center">
+                <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div><div id="qrDetalle"></div>
+                <button id="btnVerArchivoDetalle" class="hidden mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold">📎 Ver archivo asociado</button>
             </div>
         </div>
-    </div>
+        <div class="flex gap-2 border-t pt-3"><button id="btnDetalleEditar" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">✏️ Editar</button><button onclick="cerrarDetalle()" class="bg-slate-200 rounded-lg px-4 py-2 text-xs font-semibold ml-auto">Cerrar</button></div>
+    </div></div>
 </div>
 
 <script>
-    const SUPABASE_URL = "https://bnnixbgctotrptoxjxhw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJubml4YmdjdG90cnB0b3hqeGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTgyNTksImV4cCI6MjEwNjgzNDI1OX0.MPlrkcRRr2sLs5Jwc3GzqttIAtHUZCxJaIf5qIFToB8";
+// =========================================================
+// 1) CONFIGURACIÓN FIREBASE
+// =========================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyCtkeAfKKGn-n-zJZxaeMx1VGNy53ny5wM",
+    authDomain: "stock-3ce41.firebaseapp.com",
+    projectId: "stock-3ce41",
+    storageBucket: "stock-3ce41.firebasestorage.app",
+    messagingSenderId: "807024859476",
+    appId: "1:807024859476:web:55c923409676d986f5d0c1"
+};
 
-    const { createClient } = window.supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let app;
+let db;
+let storage;
+let auth;
+let piezas = [];
+let solicitudes = [];
+let movimientos = [];
+let escaner = null;
+let unsubscribePiezas = null;
+let unsubscribeSolicitudes = null;
+let unsubscribeMovimientos = null;
+const $ = id => document.getElementById(id);
 
-    let piezas = [];
-    let solicitudes = [];
-    let escaner = null;
-    const $ = id => document.getElementById(id);
+function mostrarError(mensaje) {
+    console.error(mensaje);
+    alert(mensaje);
+}
 
-    async function inicializarSupabase() {
-        try {
-            const { error } = await supabaseClient.from("piezas").select("id", { head: true, count: "exact" });
-            if (error) throw error;
-            window.supabaseReady = true;
-            $('estadoConexion').textContent = "Supabase conectado";
-            $('estadoConexion').className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
-            await cargarTodo();
-        } catch (err) {
-            console.error(err);
-            $('estadoConexion').textContent = "Error de conexión";
-            $('estadoConexion').className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
+function firebaseConfigCompleta() {
+    return Object.values(firebaseConfig).every(v => v && !String(v).includes("PEGA_AQUI"));
+}
+
+async function inicializarFirebase() {
+    try {
+        if (!firebaseConfigCompleta()) {
+            throw new Error("Falta configurar firebaseConfig en el archivo HTML.");
         }
+
+        if (!firebase.apps.length) {
+            app = firebase.initializeApp(firebaseConfig);
+        } else {
+            app = firebase.app();
+        }
+
+        db = firebase.firestore();
+        storage = firebase.storage();
+        auth = firebase.auth();
+
+        // Inicio de sesión anónimo para no dejar Firestore/Storage completamente abiertos.
+        await auth.signInAnonymously();
+
+        $('estadoConexion').textContent = "Firebase conectado";
+        $('estadoConexion').className = "text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full";
+
+        escucharPiezas();
+        escucharSolicitudes();
+        escucharMovimientos();
+    } catch (err) {
+        console.error(err);
+        $('estadoConexion').textContent = "Error de Firebase";
+        $('estadoConexion').className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
+        mostrarError("No se pudo conectar con Firebase. Revisa firebaseConfig, Firestore, Storage y el acceso anónimo.\n\n" + (err.message || err));
     }
+}
 
-    window.addEventListener("DOMContentLoaded", inicializarSupabase);
+window.addEventListener("DOMContentLoaded", inicializarFirebase);
 
-    function mostrarSeccion(s) {
-        $('seccionInventario').classList.toggle('hidden', s !== 'inventario');
-        $('seccionSolicitudes').classList.toggle('hidden', s !== 'solicitudes');
-    }
+function mostrarSeccion(seccion) {
+    $('seccionInventario').classList.toggle('hidden', seccion !== 'inventario');
+    $('seccionSolicitudes').classList.toggle('hidden', seccion !== 'solicitudes');
+    $('seccionMovimientos').classList.toggle('hidden', seccion !== 'movimientos');
+}
 
-    async function cargarTodo() {
-        await cargarPiezas();
-        await cargarSolicitudes();
+// =========================================================
+// 2) INVENTARIO EN TIEMPO REAL
+// =========================================================
+function escucharPiezas() {
+    if (unsubscribePiezas) unsubscribePiezas();
+    unsubscribePiezas = db.collection('piezas').orderBy('fechaRegistro', 'desc').onSnapshot(snapshot => {
+        piezas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        actualizarEstadisticas();
         actualizarSelectPiezas();
         actualizarSelectFiltros();
-    }
-
-    async function cargarPiezas() {
-        const { data, error } = await supabaseClient.from('piezas').select('*').order('fecha_registro', { ascending: false });
-        if (error) return console.error(error);
-        piezas = data || [];
-        actualizarEstadisticas();
         aplicarFiltros();
         actualizarCodigoVistaPrevia();
-    }
+    }, err => {
+        console.error(err);
+        mostrarError("No se pudo cargar el inventario: " + err.message);
+    });
+}
 
-    function actualizarCodigoVistaPrevia() {
-        if ($('editDocId').value) return;
-        const cat = $('categoria').value;
-        const proc = $('proceso').value;
-        const conteo = piezas.filter(p => p.codigo_pieza && p.codigo_pieza.startsWith(cat + proc)).length + 1;
-        $('codigoGeneradoVista').textContent = `${cat}${proc}-P-${String(conteo).padStart(3, '0')}`;
-    }
-
-    async function guardarPieza(e) {
-        e.preventDefault();
-        const id = $('editDocId').value;
-        const codigo = id ? $('codigoGeneradoVista').textContent : `${$('categoria').value}${$('proceso').value}-P-${String(piezas.length + 1).padStart(3, '0')}`;
-
-        const payload = {
-            codigo_pieza: codigo,
-            nombre: $('nombre').value.toUpperCase(),
-            categoria: $('categoria').value,
-            proceso: $('proceso').value,
-            material: $('material').value.toUpperCase(),
-            calibre: $('calibre').value,
-            aplicacion: $('aplicacion').value,
-            stock_actual: parseInt($('stockActual').value),
-            stock_min: parseInt($('stockMin').value),
-            stock_max: parseInt($('stockMax').value)
-        };
-
-        let res = id 
-            ? await supabaseClient.from('piezas').update(payload).eq('id', id)
-            : await supabaseClient.from('piezas').insert([payload]);
-
-        if (res.error) alert("Error guardando pieza: " + res.error.message);
-        else {
-            cancelarEdicion();
-            await cargarPiezas();
-        }
-    }
-
-    function editarPieza(id) {
-        const p = piezas.find(x => x.id === id);
-        if (!p) return;
-        $('editDocId').value = p.id;
-        $('categoria').value = p.categoria;
-        $('proceso').value = p.proceso;
-        $('codigoGeneradoVista').textContent = p.codigo_pieza;
-        $('nombre').value = p.nombre;
-        $('material').value = p.material;
-        $('calibre').value = p.calibre;
-        $('aplicacion').value = p.aplicacion \vert{}\vert{} '';$('stockActual').value = p.stock_actual;
-        $('stockMin').value = p.stock_min;
-        $('stockMax').value = p.stock_max;
-
-        $('tituloFormulario').textContent = "Editar pieza";
-        $('estadoEdicion').classList.remove('hidden');$('btnCancelarEdicion').classList.remove('hidden');
-    }
-
-    function cancelarEdicion() {
-        $('formPieza').reset();
-        $('editDocId').value = '';$('tituloFormulario').textContent = "Registrar nueva pieza";
-        $('estadoEdicion').classList.add('hidden');$('btnCancelarEdicion').classList.add('hidden');
-        actualizarCodigoVistaPrevia();
-    }
-
-    async function eliminarPieza(id) {
-        if (!confirm("¿Eliminar esta pieza del inventario?")) return;
-        const { error } = await supabaseClient.from('piezas').delete().eq('id', id);
-        if (error) alert("Error: " + error.message);
-        else await cargarPiezas();
-    }
-
-    function aplicarFiltros() {
-        const fNom = $('filtroNombre').value.toLowerCase();
-        const fMat = $('filtroMaterial').value;
-        const fCal = $('filtroCalibre').value;
-        const fCat = $('filtroCategoria').value;
-        const fEst = $('filtroEstadoStock').value;
-
-        const filtradas = piezas.filter(p => {
-            const mNom = p.nombre.toLowerCase().includes(fNom) || p.codigo_pieza.toLowerCase().includes(fNom);
-            const mMat = !fMat || p.material === fMat;
-            const mCal = !fCal || p.calibre === fCal;
-            const mCat = !fCat || p.categoria === fCat;
-            let mEst = true;
-            if (fEst === 'BAJO') mEst = p.stock_actual <= p.stock_min && p.stock_actual > 0;
-            if (fEst === 'CERO') mEst = p.stock_actual === 0;
-            if (fEst === 'OK') mEst = p.stock_actual > p.stock_min;
-
-            return mNom && mMat && mCal && mCat && mEst;
-        });
-
-        renderTablaPiezas(filtradas);
-    }
-
-    function renderTablaPiezas(lista) {
-        $('textoResultados').textContent = `${lista.length} piezas encontradas`;
-        const tbody = $('tablaPiezasBody');
-        if (lista.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = lista.map((p, idx) => {
-            let badge = `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">OK</span>`;
-            if (p.stock_actual <= p.stock_min) badge = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Bajo Min</span>`;
-            if (p.stock_actual === 0) badge = `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">Agotado</span>`;
-
-            return `<tr class="hover:bg-slate-50">
-                <td class="p-2.5 font-mono">${idx + 1}</td>
-                <td class="p-2.5 font-bold font-mono text-orange-700">${p.codigo_pieza}</td>
-                <td class="p-2.5 font-bold">${p.nombre}</td>
-                <td class="p-2.5">${p.material}</td>
-                <td class="p-2.5">${p.calibre}</td>
-                <td class="p-2.5 text-center font-bold">${p.stock_actual} / ${p.stock_min}</td>
-                <td class="p-2.5">${badge}</td>
-                <td class="p-2.5 flex gap-1">
-                    <button onclick="verDetalle('${p.id}')" class="bg-slate-100 hover:bg-slate-200 p-1.5 rounded">👁️</button>
-                    <button onclick="editarPieza('${p.id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-1.5 rounded">✏️</button>
-                    <button onclick="eliminarPieza('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 p-1.5 rounded">🗑️</button>
-                </td>
-            </tr>`;
-        }).join('');
-    }
-
-    function actualizarEstadisticas() {
-        $('statPiezas').textContent = piezas.length;
-        $('statUnidades').textContent = piezas.reduce((a, b) => a + (b.stock_actual \vert{}\vert{} 0), 0);$('statBajoMin').textContent = piezas.filter(p => p.stock_actual <= p.stock_min).length;
-    }
-
-    function actualizarSelectFiltros() {
-        const matSet = [...new Set(piezas.map(p => p.material))];
-        const calSet = [...new Set(piezas.map(p => p.calibre))];
-
-        $('filtroMaterial').innerHTML = `<option value="">Todos los materiales</option>` + matSet.map(m => `<option value="${m}">${m}</option>`).join('');
-        $('filtroCalibre').innerHTML = `<option value="">Todos los calibres</option>` + calSet.map(c => `<option value="${c}">${c}</option>`).join('');
-    }
-
-    function limpiarFiltros() {
-        $('filtroNombre').value = '';
-        $('filtroMaterial').value = '';$('filtroCalibre').value = '';
-        $('filtroCategoria').value = '';$('filtroEstadoStock').value = '';
-        aplicarFiltros();
-    }
-
-    // SOLICITUDES
-    async function cargarSolicitudes() {
-        const { data, error } = await supabaseClient.from('solicitudes').select('*').order('created_at', { ascending: false });
-        if (error) return console.error(error);
-        solicitudes = data || [];
+function escucharSolicitudes() {
+    if (unsubscribeSolicitudes) unsubscribeSolicitudes();
+    unsubscribeSolicitudes = db.collection('solicitudes').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        solicitudes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         $('statSolicitudes').textContent = solicitudes.filter(s => s.estado === 'Pendiente').length;
         renderSolicitudes();
-    }
+    }, err => console.error(err));
+}
 
-    function actualizarSelectPiezas() {
-        $('solicitudPieza').innerHTML = `<option value="">Selecciona una pieza</option>` +
-            piezas.map(p => `<option value="${p.codigo_pieza}">${p.codigo_pieza} - ${p.nombre}</option>`).join('');
-    }
+function escucharMovimientos() {
+    if (unsubscribeMovimientos) unsubscribeMovimientos();
+    unsubscribeMovimientos = db.collection('movimientos').orderBy('createdAt', 'desc').limit(200).onSnapshot(snapshot => {
+        movimientos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderMovimientos();
+    }, err => console.error(err));
+}
 
-    async function guardarSolicitud(e) {
-        e.preventDefault();
+function actualizarEstadisticas() {
+    $('statPiezas').textContent = piezas.length;
+    $('statUnidades').textContent = piezas.reduce((a, p) => a + (Number(p.stockActual) || 0), 0);
+    $('statBajoMin').textContent = piezas.filter(p => Number(p.stockActual) > 0 && Number(p.stockActual) <= Number(p.stockMin)).length;
+    $('statSinStock').textContent = piezas.filter(p => Number(p.stockActual) === 0).length;
+}
+
+function actualizarCodigoVistaPrevia() {
+    if ($('editDocId').value) return;
+    const cat = $('categoria').value;
+    const proc = $('proceso').value;
+    const prefijo = `${cat}${proc}`;
+    const numeros = piezas
+        .filter(p => String(p.codigoPieza || '').startsWith(prefijo + '-P-'))
+        .map(p => Number(String(p.codigoPieza).split('-P-')[1]))
+        .filter(Number.isFinite);
+    const siguiente = numeros.length ? Math.max(...numeros) + 1 : 1;
+    $('codigoGeneradoVista').textContent = `${prefijo}-P-${String(siguiente).padStart(3, '0')}`;
+}
+
+async function obtenerSiguienteCodigo(categoria, proceso) {
+    const prefijo = `${categoria}${proceso}`;
+    const numerosLocales = piezas
+        .filter(p => String(p.codigoPieza || '').startsWith(prefijo + '-P-'))
+        .map(p => Number(String(p.codigoPieza).split('-P-')[1]))
+        .filter(Number.isFinite);
+    const minimoInicial = numerosLocales.length ? Math.max(...numerosLocales) : 0;
+    const refContador = db.collection('contadores').doc(prefijo);
+
+    const siguiente = await db.runTransaction(async transaction => {
+        const snap = await transaction.get(refContador);
+        const ultimo = snap.exists ? Number(snap.data().ultimo) || 0 : 0;
+        const numero = Math.max(ultimo, minimoInicial) + 1;
+        transaction.set(refContador, { ultimo: numero, prefijo, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        return numero;
+    });
+
+    return `${prefijo}-P-${String(siguiente).padStart(3, '0')}`;
+}
+
+// =========================================================
+// 3) PIEZAS + ARCHIVOS EN STORAGE
+// =========================================================
+async function guardarPieza(e) {
+    e.preventDefault();
+    if (!db || !storage) return mostrarError("Firebase todavía no está listo.");
+
+    const id = $('editDocId').value.trim();
+    const boton = $('btnGuardar');
+    boton.disabled = true;
+    boton.textContent = "Guardando...";
+
+    try {
+        const stockActual = Number($('stockActual').value);
+        const stockMin = Number($('stockMin').value);
+        const stockMax = Number($('stockMax').value);
+        if (stockMax < stockMin) throw new Error("El stock máximo no puede ser menor que el stock mínimo.");
+        if (stockActual < 0 || stockMin < 0 || stockMax < 1) throw new Error("Los valores de stock no son válidos.");
+
+        let piezaId = id;
+        let codigo = $('codigoGeneradoVista').textContent;
+        let archivoUrl = '';
+        let archivoNombre = '';
+        let archivoPath = $('editArchivoPath').value || '';
+        let archivoTipo = '';
+
+        if (!piezaId) {
+            piezaId = db.collection('piezas').doc().id;
+            codigo = await obtenerSiguienteCodigo($('categoria').value, $('proceso').value);
+        }
+
+        const piezaExistente = id ? piezas.find(p => p.id === id) : null;
+        archivoUrl = piezaExistente?.archivoUrl || '';
+        archivoNombre = piezaExistente?.archivoNombre || '';
+        archivoTipo = piezaExistente?.archivoTipo || '';
+
+        const archivo = $('archivoPieza').files[0];
+        if (archivo) {
+            // Límite práctico para la aplicación web. Para archivos CAD grandes conviene configurar Storage con el límite que necesites.
+            const maxBytes = 50 * 1024 * 1024;
+            if (archivo.size > maxBytes) throw new Error("El archivo supera el límite de 50 MB.");
+
+            const nombreSeguro = archivo.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            archivoPath = `piezas/${piezaId}/${Date.now()}_${nombreSeguro}`;
+            const ref = storage.ref(archivoPath);
+            const upload = await ref.put(archivo, { contentType: archivo.type || 'application/octet-stream' });
+            archivoUrl = await upload.ref.getDownloadURL();
+            archivoNombre = archivo.name;
+            archivoTipo = archivo.type || 'application/octet-stream';
+        }
+
+        const ahora = firebase.firestore.FieldValue.serverTimestamp();
         const payload = {
-            pieza_codigo: $('solicitudPieza').value,
-            cantidad: parseInt($('solicitudCantidad').value),
-            prioridad: $('solicitudPrioridad').value,
-            solicitante: $('solicitudSolicitante').value,
-            motivo: $('solicitudMotivo').value,
-            estado: 'Pendiente'
+            codigoPieza: codigo,
+            nombre: $('nombre').value.trim().toUpperCase(),
+            categoria: $('categoria').value,
+            proceso: $('proceso').value,
+            material: $('material').value.trim().toUpperCase(),
+            calibre: $('calibre').value.trim(),
+            unidad: $('unidad').value,
+            ubicacion: $('ubicacion').value.trim().toUpperCase(),
+            aplicacion: $('aplicacion').value.trim(),
+            proveedor: $('proveedor').value.trim(),
+            numeroPlano: $('numeroPlano').value.trim().toUpperCase(),
+            stockActual,
+            stockMin,
+            stockMax,
+            descripcion: $('descripcion').value.trim(),
+            archivoUrl,
+            archivoNombre,
+            archivoTipo,
+            archivoPath,
+            fechaActualizacion: ahora,
+            actualizadoPor: auth.currentUser?.uid || null,
+            activo: true
         };
 
-        const { error } = await supabaseClient.from('solicitudes').insert([payload]);
-        if (error) alert("Error: " + error.message);
-        else {
-            $('formSolicitud').reset();
-            await cargarSolicitudes();
+        if (!id) {
+            payload.fechaRegistro = ahora;
+            payload.registradoPor = auth.currentUser?.uid || null;
+            await db.collection('piezas').doc(piezaId).set(payload);
+
+            if (stockActual > 0) {
+                await db.collection('movimientos').add({
+                    piezaId,
+                    piezaCodigo: codigo,
+                    piezaNombre: payload.nombre,
+                    tipo: 'ENTRADA_INICIAL',
+                    cantidad: stockActual,
+                    stockAnterior: 0,
+                    stockResultante: stockActual,
+                    responsable: 'Registro inicial',
+                    motivo: 'Alta de pieza en inventario',
+                    createdAt: ahora,
+                    usuarioId: auth.currentUser?.uid || null
+                });
+            }
+        } else {
+            await db.collection('piezas').doc(id).update(payload);
+
+            const stockAnterior = Number(piezaExistente?.stockActual || 0);
+            if (stockAnterior !== stockActual) {
+                await db.collection('movimientos').add({
+                    piezaId: id,
+                    piezaCodigo: codigo,
+                    piezaNombre: payload.nombre,
+                    tipo: 'AJUSTE_EDICION',
+                    cantidad: Math.abs(stockActual - stockAnterior),
+                    stockAnterior,
+                    stockResultante: stockActual,
+                    responsable: 'Edición de pieza',
+                    motivo: 'Ajuste realizado desde el formulario de pieza',
+                    createdAt: ahora,
+                    usuarioId: auth.currentUser?.uid || null
+                });
+            }
         }
-    }
 
-    function renderSolicitudes() {
-        const fil = $('filtroSolicitudEstado').value;
-        const lista = fil ? solicitudes.filter(s => s.estado === fil) : solicitudes;
-        const tbody = $('tablaSolicitudesBody');
-
-        if (lista.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400">Sin solicitudes.</td></tr>`;
-            return;
+        // Si se reemplazó el archivo, elimina el anterior para no acumular basura en Storage.
+        if (archivo && piezaExistente?.archivoPath && piezaExistente.archivoPath !== archivoPath) {
+            try { await storage.ref(piezaExistente.archivoPath).delete(); } catch (deleteErr) { console.warn('No se eliminó el archivo anterior:', deleteErr); }
         }
 
-        tbody.innerHTML = lista.map(s => `
-            <tr class="hover:bg-slate-50">
-                <td class="p-2.5 text-[11px]">${new Date(s.created_at || Date.now()).toLocaleDateString()}</td>
-                <td class="p-2.5 font-bold font-mono text-orange-700">${s.pieza_codigo}</td>
-                <td class="p-2.5 text-center font-bold">${s.cantidad}</td>
-                <td class="p-2.5">${s.prioridad}</td>
-                <td class="p-2.5">${s.solicitante}</td>
-                <td class="p-2.5">
-                    <span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full text-[10px] font-bold">${s.estado}</span>
-                </td>
-            </tr>
-        `).join('');
+        cancelarEdicion();
+        alert(id ? "Pieza actualizada correctamente." : "Pieza registrada correctamente.");
+    } catch (err) {
+        console.error(err);
+        mostrarError("Error guardando pieza: " + err.message);
+    } finally {
+        boton.disabled = false;
+        boton.textContent = "💾 Guardar pieza";
+    }
+}
+
+function editarPieza(id) {
+    const p = piezas.find(x => x.id === id);
+    if (!p) return;
+
+    $('editDocId').value = p.id;
+    $('categoria').value = p.categoria || 'V';
+    $('proceso').value = p.proceso || 'D';
+    $('codigoGeneradoVista').textContent = p.codigoPieza || '';
+    $('nombre').value = p.nombre || '';
+    $('material').value = p.material || '';
+    $('calibre').value = p.calibre || '';
+    $('unidad').value = p.unidad || 'pieza';
+    $('ubicacion').value = p.ubicacion || '';
+    $('aplicacion').value = p.aplicacion || '';
+    $('proveedor').value = p.proveedor || '';
+    $('numeroPlano').value = p.numeroPlano || '';
+    $('stockActual').value = p.stockActual ?? 0;
+    $('stockMin').value = p.stockMin ?? 1;
+    $('stockMax').value = p.stockMax ?? 5;
+    $('descripcion').value = p.descripcion || '';
+    $('editArchivoPath').value = p.archivoPath || '';
+    $('archivoPieza').value = '';
+    $('archivoActual').innerHTML = p.archivoUrl ? `Archivo actual: <a class="text-blue-600 hover:underline" href="${p.archivoUrl}" target="_blank" rel="noopener">${escapeHtml(p.archivoNombre || 'Ver archivo')}</a>` : 'Sin archivo asociado.';
+
+    $('tituloFormulario').textContent = "Editar pieza";
+    $('estadoEdicion').classList.remove('hidden');
+    $('btnCancelarEdicion').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelarEdicion() {
+    $('formPieza').reset();
+    $('editDocId').value = '';
+    $('editArchivoPath').value = '';
+    $('archivoActual').textContent = '';
+    $('stockActual').value = 0;
+    $('stockMin').value = 1;
+    $('stockMax').value = 5;
+    $('tituloFormulario').textContent = "Registrar nueva pieza";
+    $('estadoEdicion').classList.add('hidden');
+    $('btnCancelarEdicion').classList.add('hidden');
+    actualizarCodigoVistaPrevia();
+}
+
+async function eliminarPieza(id) {
+    const p = piezas.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`¿Eliminar la pieza ${p.codigoPieza}? Se eliminará también su registro de inventario.`)) return;
+
+    try {
+        await db.collection('piezas').doc(id).update({ activo: false, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp() });
+        // La mantenemos como registro histórico: no se borra físicamente.
+        if (p.archivoPath) {
+            try { await storage.ref(p.archivoPath).delete(); } catch (err) { console.warn('No se eliminó archivo:', err); }
+        }
+        alert('Pieza marcada como inactiva. Se conserva el registro para trazabilidad.');
+    } catch (err) {
+        mostrarError('Error al desactivar la pieza: ' + err.message);
+    }
+}
+
+// =========================================================
+// 4) FILTROS Y TABLA
+// =========================================================
+function aplicarFiltros() {
+    const fNom = $('filtroNombre').value.toLowerCase().trim();
+    const fMat = $('filtroMaterial').value;
+    const fCal = $('filtroCalibre').value;
+    const fCat = $('filtroCategoria').value;
+    const fEst = $('filtroEstadoStock').value;
+
+    const filtradas = piezas.filter(p => {
+        if (p.activo === false) return false;
+        const texto = [p.nombre, p.codigoPieza, p.material, p.ubicacion, p.numeroPlano, p.aplicacion].join(' ').toLowerCase();
+        const mNom = !fNom || texto.includes(fNom);
+        const mMat = !fMat || p.material === fMat;
+        const mCal = !fCal || p.calibre === fCal;
+        const mCat = !fCat || p.categoria === fCat;
+        const stock = Number(p.stockActual || 0);
+        const minimo = Number(p.stockMin || 0);
+        let mEst = true;
+        if (fEst === 'BAJO') mEst = stock > 0 && stock <= minimo;
+        if (fEst === 'CERO') mEst = stock === 0;
+        if (fEst === 'OK') mEst = stock > minimo;
+        return mNom && mMat && mCal && mCat && mEst;
+    });
+
+    renderTablaPiezas(filtradas);
+}
+
+function estadoBadge(p) {
+    const stock = Number(p.stockActual || 0);
+    const minimo = Number(p.stockMin || 0);
+    if (stock === 0) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">Agotado</span>`;
+    if (stock <= minimo) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Bajo mínimo</span>`;
+    return `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">OK</span>`;
+}
+
+function renderTablaPiezas(lista) {
+    $('textoResultados').textContent = `${lista.length} piezas encontradas`;
+    const tbody = $('tablaPiezasBody');
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
+        return;
     }
 
-    // MODALES & QR
-    function verDetalle(id) {
-        const p = piezas.find(x => x.id === id);
-        if (!p) return;
-        $('dNombre').textContent = p.nombre;
-        $('dMaterial').textContent = p.material;
-        $('dCalibre').textContent = p.calibre;
-        $('dAplicacion').textContent = p.aplicacion \vert{}\vert{} '—';$('dStock').textContent = `${p.stock_actual} unidades`;
-        $('detalleCodigo').textContent = p.codigo_pieza;
+    tbody.innerHTML = lista.map((p, idx) => `
+        <tr class="hover:bg-slate-50">
+            <td class="p-2.5 font-mono">${idx + 1}</td>
+            <td class="p-2.5 font-bold font-mono text-orange-700">${escapeHtml(p.codigoPieza || '')}</td>
+            <td class="p-2.5 font-bold">${escapeHtml(p.nombre || '')}</td>
+            <td class="p-2.5">${escapeHtml(p.material || '')}</td>
+            <td class="p-2.5">${escapeHtml(p.calibre || '')}</td>
+            <td class="p-2.5">${escapeHtml(p.ubicacion || 'Sin asignar')}</td>
+            <td class="p-2.5 text-center font-bold">${Number(p.stockActual || 0)} / ${Number(p.stockMin || 0)}</td>
+            <td class="p-2.5">${p.archivoUrl ? `<button onclick="verArchivo('${p.id}')" class="text-blue-600 hover:underline font-semibold">📎 Ver</button>` : '<span class="text-slate-400">—</span>'}</td>
+            <td class="p-2.5">${estadoBadge(p)}</td>
+            <td class="p-2.5"><div class="flex gap-1">
+                <button title="Detalle" onclick="verDetalle('${p.id}')" class="bg-slate-100 hover:bg-slate-200 p-1.5 rounded">👁️</button>
+                <button title="Editar" onclick="editarPieza('${p.id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-1.5 rounded">✏️</button>
+                <button title="Movimiento" onclick="abrirMovimiento('${p.id}')" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 p-1.5 rounded">🔄</button>
+                <button title="Desactivar" onclick="eliminarPieza('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 p-1.5 rounded">🗑️</button>
+            </div></td>
+        </tr>`).join('');
+}
 
-        $('qrDetalle').innerHTML = '';
-        new QRCode($('qrDetalle'), { text: p.codigo_pieza, width: 120, height: 120 });
+function actualizarSelectFiltros() {
+    const matSet = [...new Set(piezas.map(p => p.material).filter(Boolean))].sort();
+    const calSet = [...new Set(piezas.map(p => p.calibre).filter(Boolean))].sort();
+    $('filtroMaterial').innerHTML = `<option value="">Todos los materiales</option>` + matSet.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    $('filtroCalibre').innerHTML = `<option value="">Todos los calibres</option>` + calSet.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
 
-        $('btnDetalleEditar').onclick = () => { cerrarDetalle(); editarPieza(p.id); };$('modalDetalle').classList.remove('hidden');
+function limpiarFiltros() {
+    $('filtroNombre').value = ''; $('filtroMaterial').value = ''; $('filtroCalibre').value = ''; $('filtroCategoria').value = ''; $('filtroEstadoStock').value = '';
+    aplicarFiltros();
+}
+
+function actualizarSelectPiezas() {
+    const opciones = piezas.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${escapeHtml(p.codigoPieza || '')} - ${escapeHtml(p.nombre || '')}</option>`).join('');
+    $('solicitudPieza').innerHTML = `<option value="">Selecciona una pieza</option>${opciones}`;
+    $('movPieza').innerHTML = `<option value="">Selecciona una pieza</option>${opciones}`;
+}
+
+// =========================================================
+// 5) ARCHIVOS
+// =========================================================
+function verArchivo(id) {
+    const p = piezas.find(x => x.id === id);
+    if (p?.archivoUrl) window.open(p.archivoUrl, '_blank', 'noopener');
+}
+
+// =========================================================
+// 6) SOLICITUDES
+// =========================================================
+async function guardarSolicitud(e) {
+    e.preventDefault();
+    const piezaId = $('solicitudPieza').value;
+    const p = piezas.find(x => x.id === piezaId);
+    if (!p) return mostrarError('Selecciona una pieza válida.');
+
+    const payload = {
+        piezaId,
+        piezaCodigo: p.codigoPieza,
+        piezaNombre: p.nombre,
+        cantidad: Number($('solicitudCantidad').value),
+        prioridad: $('solicitudPrioridad').value,
+        solicitante: $('solicitudSolicitante').value.trim(),
+        motivo: $('solicitudMotivo').value.trim(),
+        estado: 'Pendiente',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        usuarioId: auth.currentUser?.uid || null
+    };
+
+    try {
+        await db.collection('solicitudes').add(payload);
+        $('formSolicitud').reset();
+        alert('Solicitud creada correctamente.');
+    } catch (err) {
+        mostrarError('Error al crear solicitud: ' + err.message);
+    }
+}
+
+async function cambiarEstadoSolicitud(id, estado) {
+    try {
+        await db.collection('solicitudes').doc(id).update({ estado, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch (err) { mostrarError('No se pudo actualizar la solicitud: ' + err.message); }
+}
+
+function renderSolicitudes() {
+    const fil = $('filtroSolicitudEstado').value;
+    const lista = fil ? solicitudes.filter(s => s.estado === fil) : solicitudes;
+    const tbody = $('tablaSolicitudesBody');
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400">Sin solicitudes.</td></tr>`;
+        return;
     }
 
-    function cerrarDetalle() { $('modalDetalle').classList.add('hidden'); }
+    tbody.innerHTML = lista.map(s => `
+        <tr class="hover:bg-slate-50">
+            <td class="p-2.5 text-[11px]">${fechaTexto(s.createdAt)}</td>
+            <td class="p-2.5"><div class="font-bold font-mono text-orange-700">${escapeHtml(s.piezaCodigo || '')}</div><div class="text-[11px] text-slate-500">${escapeHtml(s.piezaNombre || '')}</div></td>
+            <td class="p-2.5 text-center font-bold">${Number(s.cantidad || 0)}</td>
+            <td class="p-2.5">${escapeHtml(s.prioridad || '')}</td>
+            <td class="p-2.5">${escapeHtml(s.solicitante || '')}</td>
+            <td class="p-2.5"><select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded-lg px-2 py-1 text-xs"><option ${s.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option><option ${s.estado === 'En proceso' ? 'selected' : ''}>En proceso</option><option ${s.estado === 'Completada' ? 'selected' : ''}>Completada</option><option ${s.estado === 'Cancelada' ? 'selected' : ''}>Cancelada</option></select></td>
+        </tr>`).join('');
+}
 
-    function abrirEscaner() {
-        $('modalEscaner').classList.remove('hidden');
+// =========================================================
+// 7) MOVIMIENTOS DE STOCK
+// =========================================================
+function abrirMovimiento(piezaId = '') {
+    $('movPieza').value = piezaId || '';
+    $('movTipo').value = 'ENTRADA';
+    $('movCantidad').value = 1;
+    $('movResponsable').value = '';
+    $('movMotivo').value = '';
+    $('modalMovimiento').classList.remove('hidden');
+}
+
+function cerrarMovimiento() { $('modalMovimiento').classList.add('hidden'); }
+
+async function guardarMovimiento(e) {
+    e.preventDefault();
+    const piezaId = $('movPieza').value;
+    const tipo = $('movTipo').value;
+    const cantidad = Number($('movCantidad').value);
+    const responsable = $('movResponsable').value.trim();
+    const motivo = $('movMotivo').value.trim();
+    if (!piezaId || cantidad < 1 || !responsable) return mostrarError('Completa los datos del movimiento.');
+
+    const piezaRef = db.collection('piezas').doc(piezaId);
+    try {
+        await db.runTransaction(async transaction => {
+            const snap = await transaction.get(piezaRef);
+            if (!snap.exists) throw new Error('La pieza ya no existe.');
+            const p = snap.data();
+            const anterior = Number(p.stockActual || 0);
+            let nuevo = anterior;
+            if (tipo === 'ENTRADA') nuevo = anterior + cantidad;
+            if (tipo === 'SALIDA') {
+                nuevo = anterior - cantidad;
+                if (nuevo < 0) throw new Error('No hay suficiente stock para realizar esta salida.');
+            }
+            if (tipo === 'AJUSTE') nuevo = cantidad;
+
+            transaction.update(piezaRef, { stockActual: nuevo, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp(), actualizadoPor: auth.currentUser?.uid || null });
+            const movRef = db.collection('movimientos').doc();
+            transaction.set(movRef, {
+                piezaId,
+                piezaCodigo: p.codigoPieza,
+                piezaNombre: p.nombre,
+                tipo,
+                cantidad,
+                stockAnterior: anterior,
+                stockResultante: nuevo,
+                responsable,
+                motivo,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                usuarioId: auth.currentUser?.uid || null
+            });
+        });
+
+        cerrarMovimiento();
+        alert('Movimiento registrado correctamente.');
+    } catch (err) {
+        mostrarError('Error al registrar movimiento: ' + err.message);
+    }
+}
+
+function renderMovimientos() {
+    const tbody = $('tablaMovimientosBody');
+    if (!movimientos.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400">Sin movimientos registrados.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = movimientos.map(m => {
+        const clase = m.tipo?.includes('SALIDA') ? 'text-red-700' : (m.tipo?.includes('ENTRADA') ? 'text-emerald-700' : 'text-orange-700');
+        return `<tr class="hover:bg-slate-50">
+            <td class="p-2.5 text-[11px]">${fechaTexto(m.createdAt, true)}</td>
+            <td class="p-2.5"><span class="font-mono font-bold text-orange-700">${escapeHtml(m.piezaCodigo || '')}</span><div class="text-[11px] text-slate-500">${escapeHtml(m.piezaNombre || '')}</div></td>
+            <td class="p-2.5 font-bold ${clase}">${escapeHtml(m.tipo || '')}</td>
+            <td class="p-2.5 font-bold">${Number(m.cantidad || 0)}</td>
+            <td class="p-2.5 font-bold">${Number(m.stockResultante || 0)}</td>
+            <td class="p-2.5">${escapeHtml(m.responsable || '')}</td>
+            <td class="p-2.5">${escapeHtml(m.motivo || '')}</td>
+        </tr>`;
+    }).join('');
+}
+
+// =========================================================
+// 8) DETALLE + QR
+// =========================================================
+function verDetalle(id) {
+    const p = piezas.find(x => x.id === id);
+    if (!p) return;
+
+    $('detalleTitulo').textContent = p.nombre || 'Detalle de pieza';
+    $('detalleCodigo').textContent = p.codigoPieza || '';
+    $('dNombre').textContent = p.nombre || '—';
+    $('dMaterial').textContent = p.material || '—';
+    $('dCalibre').textContent = p.calibre || '—';
+    $('dAplicacion').textContent = p.aplicacion || '—';
+    $('dUbicacion').textContent = p.ubicacion || 'Sin asignar';
+    $('dProveedor').textContent = p.proveedor || '—';
+    $('dPlano').textContent = p.numeroPlano || '—';
+    $('dStock').textContent = `${Number(p.stockActual || 0)} ${p.unidad || 'pieza'}(s) | mínimo: ${Number(p.stockMin || 0)} | máximo: ${Number(p.stockMax || 0)}`;
+    $('dDescripcion').textContent = p.descripcion || '—';
+    $('dArchivoNombre').textContent = p.archivoNombre || 'Sin archivo';
+
+    $('qrDetalle').innerHTML = '';
+    new QRCode($('qrDetalle'), { text: p.codigoPieza || '', width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
+
+    const btnArchivo = $('btnVerArchivoDetalle');
+    if (p.archivoUrl) {
+        btnArchivo.classList.remove('hidden');
+        btnArchivo.onclick = () => verArchivo(p.id);
+    } else {
+        btnArchivo.classList.add('hidden');
+        btnArchivo.onclick = null;
+    }
+
+    $('btnDetalleEditar').onclick = () => { cerrarDetalle(); editarPieza(p.id); };
+    $('modalDetalle').classList.remove('hidden');
+}
+
+function cerrarDetalle() { $('modalDetalle').classList.add('hidden'); }
+
+// =========================================================
+// 9) ESCÁNER QR
+// =========================================================
+function abrirEscaner() {
+    $('modalEscaner').classList.remove('hidden');
+    try {
         escaner = new Html5Qrcode("reader");
-        escaner.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (texto) => {
+        escaner.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 }, texto => {
             detenerCamara();
             cerrarEscaner();
-            const p = piezas.find(x => x.codigo_pieza === texto);
-            if (p) verDetalle(p.id);
-            else alert("Pieza no encontrada: " + texto);
-        }).catch(err => console.error(err));
+            const p = piezas.find(x => x.codigoPieza === texto.trim());
+            if (p) verDetalle(p.id); else alert("Pieza no encontrada: " + texto);
+        }).catch(err => console.error('Error de cámara:', err));
+    } catch (err) { console.error(err); }
+}
+
+function detenerCamara() {
+    if (escaner) {
+        escaner.stop().catch(() => {});
+        escaner.clear().catch(() => {});
+        escaner = null;
     }
+}
+function cerrarEscaner() { detenerCamara(); $('modalEscaner').classList.add('hidden'); }
 
-    function detenerCamara() { if (escaner) escaner.stop(); }
-    function cerrarEscaner() { detenerCamara(); $('modalEscaner').classList.add('hidden'); }
+// =========================================================
+// 10) PDF
+// =========================================================
+function descargarInventarioPDF() {
+    if (!piezas.length) return alert('No hay piezas para generar el reporte.');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(16); doc.text("Reporte de Inventario Estandarizado - VOLMEX", 14, 15);
+    doc.setFontSize(9); doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 21);
+    const data = piezas.filter(p => p.activo !== false).map((p, i) => [i + 1, p.codigoPieza, p.nombre, p.material, p.calibre, p.ubicacion || '', p.stockActual ?? 0, p.stockMin ?? 0, p.stockMax ?? 0, p.archivoUrl ? 'Sí' : 'No']);
+    doc.autoTable({ head: [['#','Código','Nombre','Material','Calibre','Ubicación','Actual','Mín.','Máx.','Archivo']], body: data, startY: 26, styles: { fontSize: 7 } });
+    doc.save("inventario_estandarizado_volmex.pdf");
+}
 
-    // PDF
-    function descargarInventarioPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.text("Reporte de Inventario - VOLMEX", 14, 15);
+// =========================================================
+// 11) UTILIDADES
+// =========================================================
+function fechaTexto(timestamp, incluirHora = false) {
+    if (!timestamp) return '—';
+    const fecha = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return fecha.toLocaleString('es-MX', incluirHora ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });
+}
 
-        const data = piezas.map((p, i) => [i + 1, p.codigo_pieza, p.nombre, p.material, p.calibre, p.stock_actual]);
-        doc.autoTable({
-            head: [['#', 'Código', 'Nombre', 'Material', 'Calibre', 'Stock']],
-            body: data,
-            startY: 20
-        });
-        doc.save("inventario_volmex.pdf");
-    }
+function escapeHtml(valor) {
+    return String(valor ?? '')
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
 </script>
 </body>
 </html>
