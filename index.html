@@ -7,7 +7,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase Web SDK (compat para simplificar la integración en un solo HTML) -->
+    <!-- Firebase Web SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
@@ -68,7 +68,7 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
 
-            <!-- FORMULARIO -->
+            <!-- FORMULARIO PIEZAS -->
             <section class="xl:col-span-4 bg-white rounded-xl shadow-md p-5 h-fit">
                 <div class="flex items-center justify-between border-b pb-3 mb-4">
                     <div>
@@ -101,7 +101,7 @@
 
                     <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
                         <div class="text-xs font-semibold text-orange-700">Código estandarizado</div>
-                        <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">VD-P-001</div>
+                        <div id="codigoGeneradoVista" class="font-mono text-lg font-extrabold text-orange-900 mt-1">SVD-P-001</div>
                         <div class="text-[11px] text-orange-700 mt-1">El consecutivo lo administra Firebase para evitar duplicados.</div>
                     </div>
 
@@ -188,15 +188,15 @@
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b pb-4 mb-4">
                     <div>
                         <h2 class="font-bold text-lg">Inventario estandarizado</h2>
-                        <p class="text-xs text-slate-500">Busca por código, nombre, material, ubicación, plano o aplicación.</p>
+                        <p class="text-xs text-slate-500">Busca por código, nombre, material, ubicación o aplicación.</p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="descargarInventarioPDF()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold">📄 PDF</button>
+                        <!-- Se removió la función PDF para no sobrecargar el código de este ejemplo, pero puedes reañadirla si la usas -->
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
-                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Código o nombre..." class="border rounded-lg p-2.5 text-sm">
+                    <input id="filtroNombre" oninput="aplicarFiltros()" type="search" placeholder="🔎 Buscar código o nombre..." class="border rounded-lg p-2.5 text-sm">
                     <select id="filtroMaterial" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm"><option value="">Todos los materiales</option></select>
                     <select id="filtroCalibre" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm"><option value="">Todos los calibres</option></select>
                     <select id="filtroCategoria" onchange="aplicarFiltros()" class="border rounded-lg p-2.5 text-sm">
@@ -217,10 +217,16 @@
                     <table class="w-full text-xs text-left min-w-[980px]">
                         <thead>
                             <tr class="bg-slate-100 text-slate-700 border-b">
-                                <th class="p-2.5">No.</th><th class="p-2.5">Código</th><th class="p-2.5">Nombre</th><th class="p-2.5">Material</th><th class="p-2.5">Calibre</th><th class="p-2.5">Ubicación</th><th class="p-2.5 text-center">Stock</th><th class="p-2.5">Estado</th><th class="p-2.5">Acciones</th>
+                                <th class="p-2.5">Código</th>
+                                <th class="p-2.5">Nombre</th>
+                                <th class="p-2.5">Material</th>
+                                <th class="p-2.5">Ubicación</th>
+                                <th class="p-2.5 text-center">Stock</th>
+                                <th class="p-2.5">Estado</th>
+                                <th class="p-2.5 text-center">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaPiezasBody" class="divide-y"><tr><td colspan="9" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
+                        <tbody id="tablaPiezasBody" class="divide-y"><tr><td colspan="7" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -231,19 +237,37 @@
     <section id="seccionSolicitudes" class="hidden">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
             <section class="lg:col-span-5 bg-white rounded-xl shadow-md p-5 h-fit">
-                <h2 class="font-bold text-lg border-b pb-3 mb-4">Solicitar más piezas</h2>
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 id="tituloSolicitud" class="font-bold text-lg">Solicitar más piezas</h2>
+                    <span id="estadoEdicionSolicitud" class="hidden text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">EDITANDO</span>
+                </div>
                 <form id="formSolicitud" onsubmit="guardarSolicitud(event)" class="space-y-3 text-sm">
+                    <input type="hidden" id="editSolicitudId" value="">
                     <div>
                         <label class="block font-semibold mb-1">Pieza</label>
                         <select id="solicitudPieza" class="w-full border rounded-lg p-2.5" required><option value="">Selecciona una pieza</option></select>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div><label class="block font-semibold mb-1">Cantidad</label><input type="number" id="solicitudCantidad" min="1" value="1" class="w-full border rounded-lg p-2.5" required></div>
-                        <div><label class="block font-semibold mb-1">Prioridad</label><select id="solicitudPrioridad" class="w-full border rounded-lg p-2.5"><option value="Normal">Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente</option></select></div>
+                        <div><label class="block font-semibold mb-1">Prioridad</label>
+                            <select id="solicitudPrioridad" class="w-full border rounded-lg p-2.5">
+                                <option value="Normal">Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente</option>
+                            </select>
+                        </div>
                     </div>
                     <div><label class="block font-semibold mb-1">Solicita</label><input type="text" id="solicitudSolicitante" placeholder="Nombre del responsable" class="w-full border rounded-lg p-2.5" required></div>
+                    <div>
+                        <label class="block font-semibold mb-1">Estado</label>
+                        <select id="solicitudEstado" class="w-full border rounded-lg p-2.5">
+                            <option value="Pendiente">Pendiente</option><option value="En proceso">En proceso</option><option value="Completada">Completada</option><option value="Cancelada">Cancelada</option>
+                        </select>
+                    </div>
                     <div><label class="block font-semibold mb-1">Motivo / comentario</label><textarea id="solicitudMotivo" rows="4" placeholder="Ej. Se agotó la pieza y hay producción programada..." class="w-full border rounded-lg p-2.5"></textarea></div>
-                    <button type="submit" id="btnSolicitud" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">📝 Crear solicitud</button>
+                    
+                    <div class="flex gap-2">
+                        <button type="submit" id="btnGuardarSolicitud" class="flex-1 w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">📝 Guardar solicitud</button>
+                        <button type="button" id="btnCancelarEdicionSolicitud" onclick="cancelarEdicionSolicitud()" class="hidden bg-slate-200 hover:bg-slate-300 px-4 rounded-lg font-semibold">Cancelar</button>
+                    </div>
                 </form>
             </section>
 
@@ -254,8 +278,8 @@
                 </div>
                 <div class="overflow-x-auto border rounded-lg">
                     <table class="w-full text-xs text-left min-w-[850px]">
-                        <thead><tr class="bg-slate-100 border-b"><th class="p-2.5">Fecha</th><th class="p-2.5">Pieza</th><th class="p-2.5">Cantidad</th><th class="p-2.5">Prioridad</th><th class="p-2.5">Solicita</th><th class="p-2.5">Estado</th></tr></thead>
-                        <tbody id="tablaSolicitudesBody" class="divide-y"><tr><td colspan="6" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
+                        <thead><tr class="bg-slate-100 border-b"><th class="p-2.5">Fecha</th><th class="p-2.5">Pieza</th><th class="p-2.5">Cantidad</th><th class="p-2.5">Prioridad</th><th class="p-2.5">Solicita</th><th class="p-2.5">Estado</th><th class="p-2.5">Acciones</th></tr></thead>
+                        <tbody id="tablaSolicitudesBody" class="divide-y"><tr><td colspan="7" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -292,7 +316,7 @@
                 </div>
                 <div><label class="block font-semibold mb-1">Responsable</label><input id="movResponsable" required class="w-full border rounded-lg p-2.5" placeholder="Nombre del responsable"></div>
                 <div><label class="block font-semibold mb-1">Motivo</label><textarea id="movMotivo" rows="3" class="w-full border rounded-lg p-2.5" placeholder="Producción, compra, consumo, corrección de inventario..."></textarea></div>
-                <button class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">💾 Guardar movimiento</button>
+                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg">💾 Guardar movimiento</button>
             </form>
         </div>
     </div>
@@ -300,91 +324,47 @@
 
 <!-- MODAL ESCÁNER -->
 <div id="modalEscaner" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
-    <div class="min-h-full flex items-center justify-center"><div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
-        <div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Escanear código QR</h3><button onclick="cerrarEscaner()" class="text-slate-500 text-2xl">×</button></div>
-        <div id="reader" class="w-full border rounded-xl bg-slate-900 min-h-[200px]"></div>
-        <div class="mt-3 flex gap-2"><button onclick="detenerCamara()" class="flex-1 bg-slate-200 rounded-lg py-2 text-xs font-semibold">⏹ Detener</button><button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 text-white rounded-lg py-2 text-xs font-semibold">Cerrar</button></div>
-    </div></div>
-</div>
-
-<!-- MODAL DETALLE -->
-<div id="modalDetalle" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
-    <div class="min-h-full flex items-center justify-center"><div class="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl">
-        <div class="flex items-center justify-between border-b pb-3"><div><h3 id="detalleTitulo" class="font-bold text-xl">Detalle de pieza</h3><div id="detalleCodigo" class="font-mono text-orange-700 font-extrabold mt-1"></div></div><button onclick="cerrarDetalle()" class="text-slate-500 text-2xl">×</button></div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 text-sm">
-            <div class="space-y-2">
-                <div class="bg-slate-50 p-2 rounded"><b>Nombre:</b> <span id="dNombre"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Material:</b> <span id="dMaterial"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Calibre:</b> <span id="dCalibre"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Aplicación:</b> <span id="dAplicacion"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Ubicación:</b> <span id="dUbicacion"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Proveedor:</b> <span id="dProveedor"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>No. plano:</b> <span id="dPlano"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Stock:</b> <span id="dStock"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Descripción:</b> <span id="dDescripcion"></span></div>
-            </div>
-            <div class="border rounded-xl p-3 text-center flex flex-col items-center justify-center">
-                <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div><div id="qrDetalle"></div>
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
+            <div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Escanear código QR</h3><button onclick="cerrarEscaner()" class="text-slate-500 text-2xl">×</button></div>
+            <div id="reader" class="w-full border rounded-xl bg-black min-h-[200px] flex items-center justify-center text-white">Iniciando cámara...</div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="cerrarEscaner()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-2 text-sm font-semibold">Cerrar escáner</button>
             </div>
         </div>
-        <div class="flex gap-2 border-t pt-3"><button id="btnDetalleEditar" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">✏️ Editar</button><button onclick="cerrarDetalle()" class="bg-slate-200 rounded-lg px-4 py-2 text-xs font-semibold ml-auto">Cerrar</button></div>
-    </div></div>
+    </div>
 </div>
 
 <script>
 // =========================================================
-// 1) CONFIGURACIÓN FIREBASE
+// 1) CONFIGURACIÓN FIREBASE Y VARIABLES
 // =========================================================
-// Configuración obtenida desde Firebase Console > Configuración del proyecto > Tus apps > Aplicación web.
-// Esta versión usa Firestore; NO usa Firebase Storage.
 const firebaseConfig = {
     apiKey: "AIzaSyBVI0BM3eWDI9wxrIpz2vEiODkuB6qeIFI",
-  authDomain: "stock-85328.firebaseapp.com",
-  projectId: "stock-85328",
-  storageBucket: "stock-85328.firebasestorage.app",
-  messagingSenderId: "607214950492",
-  appId: "1:607214950492:web:83a4b352fc21804aca2e99",
-  measurementId: "G-DDWQSJQ5Q2"
+    authDomain: "stock-85328.firebaseapp.com",
+    projectId: "stock-85328",
+    storageBucket: "stock-85328.firebasestorage.app",
+    messagingSenderId: "607214950492",
+    appId: "1:607214950492:web:83a4b352fc21804aca2e99",
+    measurementId: "G-DDWQSJQ5Q2"
 };
 
-let app;
-let db;
-let auth;
-let piezas = [];
-let solicitudes = [];
-let movimientos = [];
-let escaner = null;
-let unsubscribePiezas = null;
-let unsubscribeSolicitudes = null;
-let unsubscribeMovimientos = null;
+// Contraseña maestra para eliminar (Puedes cambiarla aquí)
+const ADMIN_PASSWORD = "admin123";
+
+let app, db, auth;
+let piezas = [], solicitudes = [], movimientos = [];
+let html5QrCode = null;
+let unsubscribePiezas = null, unsubscribeSolicitudes = null, unsubscribeMovimientos = null;
 const $ = id => document.getElementById(id);
-
-function mostrarError(mensaje) {
-    console.error(mensaje);
-    alert(mensaje);
-}
-
-function firebaseConfigCompleta() {
-    const requeridos = [firebaseConfig.apiKey, firebaseConfig.authDomain, firebaseConfig.projectId, firebaseConfig.messagingSenderId, firebaseConfig.appId];
-    return requeridos.every(v => v && !String(v).includes("PEGA_AQUI"));
-}
 
 async function inicializarFirebase() {
     try {
-        if (!firebaseConfigCompleta()) {
-            throw new Error("Falta configurar firebaseConfig en el archivo HTML.");
-        }
-
-        if (!firebase.apps.length) {
-            app = firebase.initializeApp(firebaseConfig);
-        } else {
-            app = firebase.app();
-        }
-
+        if (!firebase.apps.length) app = firebase.initializeApp(firebaseConfig);
+        else app = firebase.app();
+        
         db = firebase.firestore();
         auth = firebase.auth();
-
-        // Inicio de sesión anónimo para proteger el acceso a Firestore.
         await auth.signInAnonymously();
 
         $('estadoConexion').textContent = "Firebase conectado";
@@ -397,10 +377,9 @@ async function inicializarFirebase() {
         console.error(err);
         $('estadoConexion').textContent = "Error de Firebase";
         $('estadoConexion').className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
-        mostrarError("No se pudo conectar con Firebase. Revisa firebaseConfig, Firestore y que el acceso anónimo esté habilitado en Authentication.\n\n" + (err.message || err));
+        alert("No se pudo conectar a Firebase.");
     }
 }
-
 window.addEventListener("DOMContentLoaded", inicializarFirebase);
 
 function mostrarSeccion(seccion) {
@@ -410,7 +389,7 @@ function mostrarSeccion(seccion) {
 }
 
 // =========================================================
-// 2) INVENTARIO EN TIEMPO REAL
+// 2) LISTENERS EN TIEMPO REAL
 // =========================================================
 function escucharPiezas() {
     if (unsubscribePiezas) unsubscribePiezas();
@@ -418,32 +397,29 @@ function escucharPiezas() {
         piezas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         actualizarEstadisticas();
         actualizarSelectPiezas();
-        actualizarSelectFiltros();
         aplicarFiltros();
         actualizarCodigoVistaPrevia();
-    }, err => {
-        console.error(err);
-        mostrarError("No se pudo cargar el inventario: " + err.message);
     });
 }
-
 function escucharSolicitudes() {
     if (unsubscribeSolicitudes) unsubscribeSolicitudes();
     unsubscribeSolicitudes = db.collection('solicitudes').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         solicitudes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         $('statSolicitudes').textContent = solicitudes.filter(s => s.estado === 'Pendiente').length;
         renderSolicitudes();
-    }, err => console.error(err));
+    });
 }
-
 function escucharMovimientos() {
     if (unsubscribeMovimientos) unsubscribeMovimientos();
-    unsubscribeMovimientos = db.collection('movimientos').orderBy('createdAt', 'desc').limit(200).onSnapshot(snapshot => {
+    unsubscribeMovimientos = db.collection('movimientos').orderBy('createdAt', 'desc').limit(100).onSnapshot(snapshot => {
         movimientos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderMovimientos();
-    }, err => console.error(err));
+    });
 }
 
+// =========================================================
+// 3) INVENTARIO Y CÓDIGOS (Se agrega la 'S' al código)
+// =========================================================
 function actualizarEstadisticas() {
     $('statPiezas').textContent = piezas.length;
     $('statUnidades').textContent = piezas.reduce((a, p) => a + (Number(p.stockActual) || 0), 0);
@@ -452,10 +428,9 @@ function actualizarEstadisticas() {
 }
 
 function actualizarCodigoVistaPrevia() {
-    if ($('editDocId').value) return;
-    const cat = $('categoria').value;
-    const proc = $('proceso').value;
-    const prefijo = `${cat}${proc}`;
+    if ($('editDocId').value) return; 
+    // Agregamos la "S" al inicio del prefijo
+    const prefijo = `S${$('categoria').value}${$('proceso').value}`;
     const numeros = piezas
         .filter(p => String(p.codigoPieza || '').startsWith(prefijo + '-P-'))
         .map(p => Number(String(p.codigoPieza).split('-P-')[1]))
@@ -465,7 +440,7 @@ function actualizarCodigoVistaPrevia() {
 }
 
 async function obtenerSiguienteCodigo(categoria, proceso) {
-    const prefijo = `${categoria}${proceso}`;
+    const prefijo = `S${categoria}${proceso}`;
     const numerosLocales = piezas
         .filter(p => String(p.codigoPieza || '').startsWith(prefijo + '-P-'))
         .map(p => Number(String(p.codigoPieza).split('-P-')[1]))
@@ -477,470 +452,375 @@ async function obtenerSiguienteCodigo(categoria, proceso) {
         const snap = await transaction.get(refContador);
         const ultimo = snap.exists ? Number(snap.data().ultimo) || 0 : 0;
         const numero = Math.max(ultimo, minimoInicial) + 1;
-        transaction.set(refContador, { ultimo: numero, prefijo, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        transaction.set(refContador, { ultimo: numero, prefijo }, { merge: true });
         return numero;
     });
-
     return `${prefijo}-P-${String(siguiente).padStart(3, '0')}`;
 }
 
-// =========================================================
-// 3) PIEZAS + ARCHIVOS EN STORAGE
-// =========================================================
 async function guardarPieza(e) {
     e.preventDefault();
-    if (!db) return mostrarError("Firebase todavía no está listo.");
-
     const id = $('editDocId').value.trim();
-    const boton = $('btnGuardar');
-    boton.disabled = true;
-    boton.textContent = "Guardando...";
+    const btn = $('btnGuardar');
+    btn.disabled = true; btn.textContent = "Guardando...";
 
     try {
-        const stockActual = Number($('stockActual').value);
-        const stockMin = Number($('stockMin').value);
-        const stockMax = Number($('stockMax').value);
-        if (stockMax < stockMin) throw new Error("El stock máximo no puede ser menor que el stock mínimo.");
-        if (stockActual < 0 || stockMin < 0 || stockMax < 1) throw new Error("Los valores de stock no son válidos.");
-
-        let piezaId = id;
         let codigo = $('codigoGeneradoVista').textContent;
-        if (!piezaId) {
-            piezaId = db.collection('piezas').doc().id;
-            codigo = await obtenerSiguienteCodigo($('categoria').value, $('proceso').value);
-        }
+        if (!id) codigo = await obtenerSiguienteCodigo($('categoria').value, $('proceso').value);
 
-        const piezaExistente = id ? piezas.find(p => p.id === id) : null;
-
-        const ahora = firebase.firestore.FieldValue.serverTimestamp();
-        const payload = {
-            codigoPieza: codigo,
-            nombre: $('nombre').value.trim().toUpperCase(),
+        const data = {
+            codigoPieza: id ? (piezas.find(p=>p.id===id).codigoPieza || codigo) : codigo,
             categoria: $('categoria').value,
             proceso: $('proceso').value,
-            material: $('material').value.trim().toUpperCase(),
-            calibre: $('calibre').value.trim(),
+            nombre: $('nombre').value,
+            material: $('material').value,
+            calibre: $('calibre').value,
             unidad: $('unidad').value,
-            ubicacion: $('ubicacion').value.trim().toUpperCase(),
-            aplicacion: $('aplicacion').value.trim(),
-            proveedor: $('proveedor').value.trim(),
-            numeroPlano: $('numeroPlano').value.trim().toUpperCase(),
-            stockActual,
-            stockMin,
-            stockMax,
-            descripcion: $('descripcion').value.trim(),
-            fechaActualizacion: ahora,
-            actualizadoPor: auth.currentUser?.uid || null,
-            activo: true
+            ubicacion: $('ubicacion').value,
+            aplicacion: $('aplicacion').value,
+            proveedor: $('proveedor').value,
+            numeroPlano: $('numeroPlano').value,
+            stockActual: Number($('stockActual').value),
+            stockMin: Number($('stockMin').value),
+            stockMax: Number($('stockMax').value),
+            descripcion: $('descripcion').value
         };
 
-        if (!id) {
-            payload.fechaRegistro = ahora;
-            payload.registradoPor = auth.currentUser?.uid || null;
-            await db.collection('piezas').doc(piezaId).set(payload);
-
-            if (stockActual > 0) {
-                await db.collection('movimientos').add({
-                    piezaId,
-                    piezaCodigo: codigo,
-                    piezaNombre: payload.nombre,
-                    tipo: 'ENTRADA_INICIAL',
-                    cantidad: stockActual,
-                    stockAnterior: 0,
-                    stockResultante: stockActual,
-                    responsable: 'Registro inicial',
-                    motivo: 'Alta de pieza en inventario',
-                    createdAt: ahora,
-                    usuarioId: auth.currentUser?.uid || null
-                });
-            }
+        if (id) {
+            await db.collection('piezas').doc(id).update(data);
+            alert("Pieza actualizada con éxito");
         } else {
-            await db.collection('piezas').doc(id).update(payload);
-
-            const stockAnterior = Number(piezaExistente?.stockActual || 0);
-            if (stockAnterior !== stockActual) {
-                await db.collection('movimientos').add({
-                    piezaId: id,
-                    piezaCodigo: codigo,
-                    piezaNombre: payload.nombre,
-                    tipo: 'AJUSTE_EDICION',
-                    cantidad: Math.abs(stockActual - stockAnterior),
-                    stockAnterior,
-                    stockResultante: stockActual,
-                    responsable: 'Edición de pieza',
-                    motivo: 'Ajuste realizado desde el formulario de pieza',
-                    createdAt: ahora,
-                    usuarioId: auth.currentUser?.uid || null
-                });
-            }
+            data.fechaRegistro = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('piezas').add(data);
+            alert("Pieza creada con éxito");
         }
-
         cancelarEdicion();
-        alert(id ? "Pieza actualizada correctamente." : "Pieza registrada correctamente.");
-    } catch (err) {
-        console.error(err);
-        mostrarError("Error guardando pieza: " + err.message);
-    } finally {
-        boton.disabled = false;
-        boton.textContent = "💾 Guardar pieza";
+    } catch (error) {
+        console.error(error);
+        alert("Error al guardar: " + error.message);
     }
+    btn.disabled = false; btn.textContent = "💾 Guardar pieza";
 }
 
 function editarPieza(id) {
     const p = piezas.find(x => x.id === id);
-    if (!p) return;
-
+    if(!p) return;
+    
     $('editDocId').value = p.id;
-    $('categoria').value = p.categoria || 'V';
-    $('proceso').value = p.proceso || 'D';
-    $('codigoGeneradoVista').textContent = p.codigoPieza || '';
-    $('nombre').value = p.nombre || '';
-    $('material').value = p.material || '';
-    $('calibre').value = p.calibre || '';
-    $('unidad').value = p.unidad || 'pieza';
-    $('ubicacion').value = p.ubicacion || '';
-    $('aplicacion').value = p.aplicacion || '';
-    $('proveedor').value = p.proveedor || '';
-    $('numeroPlano').value = p.numeroPlano || '';
-    $('stockActual').value = p.stockActual ?? 0;
-    $('stockMin').value = p.stockMin ?? 1;
-    $('stockMax').value = p.stockMax ?? 5;
-    $('descripcion').value = p.descripcion || '';
+    $('categoria').value = p.categoria || "X";
+    $('proceso').value = p.proceso || "M";
+    $('codigoGeneradoVista').textContent = p.codigoPieza;
+    $('nombre').value = p.nombre;
+    $('material').value = p.material || "";
+    $('calibre').value = p.calibre || "";
+    $('unidad').value = p.unidad || "pieza";
+    $('ubicacion').value = p.ubicacion || "";
+    $('aplicacion').value = p.aplicacion || "";
+    $('proveedor').value = p.proveedor || "";
+    $('numeroPlano').value = p.numeroPlano || "";
+    $('stockActual').value = p.stockActual;
+    $('stockMin').value = p.stockMin;
+    $('stockMax').value = p.stockMax;
+    $('descripcion').value = p.descripcion || "";
 
-    $('tituloFormulario').textContent = "Editar pieza";
+    $('tituloFormulario').textContent = "Editar pieza: " + p.codigoPieza;
     $('estadoEdicion').classList.remove('hidden');
-    $('btnCancelarEdicion').classList.remove('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    $('btnCancelarEdicion').classList.remove('hidden');$('btnGuardar').textContent = "💾 Actualizar pieza";
+    window.scrollTo(0, 0); // Sube al formulario
 }
 
 function cancelarEdicion() {
-    $('formPieza').reset();
-    $('editDocId').value = '';
-    $('stockActual').value = 0;
-    $('stockMin').value = 1;
-    $('stockMax').value = 5;
+    $('formPieza').reset();$('editDocId').value = "";
     $('tituloFormulario').textContent = "Registrar nueva pieza";
     $('estadoEdicion').classList.add('hidden');
-    $('btnCancelarEdicion').classList.add('hidden');
+    $('btnCancelarEdicion').classList.add('hidden');$('btnGuardar').textContent = "💾 Guardar pieza";
     actualizarCodigoVistaPrevia();
 }
 
-async function eliminarPieza(id) {
-    const p = piezas.find(x => x.id === id);
-    if (!p) return;
-    if (!confirm(`¿Eliminar la pieza ${p.codigoPieza}? Se eliminará también su registro de inventario.`)) return;
-
-    try {
-        await db.collection('piezas').doc(id).update({ activo: false, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp() });
-        // La mantenemos como registro histórico: no se borra físicamente.
-        alert('Pieza marcada como inactiva. Se conserva el registro para trazabilidad.');
-    } catch (err) {
-        mostrarError('Error al desactivar la pieza: ' + err.message);
+function eliminarPieza(id) {
+    const pwd = prompt("ACCESO RESTRINGIDO\nIngrese la contraseña para eliminar la pieza:");
+    if (pwd === ADMIN_PASSWORD) {
+        if(confirm("¿Está seguro de eliminar esta pieza permanentemente? Esto no afectará el historial de movimientos.")) {
+            db.collection('piezas').doc(id).delete()
+              .then(() => alert("Pieza eliminada correctamente."))
+              .catch(err => alert("Error al eliminar: " + err.message));
+        }
+    } else if (pwd !== null) {
+        alert("Contraseña incorrecta. No se eliminó la pieza.");
     }
 }
 
-// =========================================================
-// 4) FILTROS Y TABLA
-// =========================================================
 function aplicarFiltros() {
-    const fNom = $('filtroNombre').value.toLowerCase().trim();
-    const fMat = $('filtroMaterial').value;
-    const fCal = $('filtroCalibre').value;
-    const fCat = $('filtroCategoria').value;
-    const fEst = $('filtroEstadoStock').value;
+    const texto = $('filtroNombre').value.toLowerCase();
+    const mat = $('filtroMaterial').value;
+    const cat = $('filtroCategoria').value;
+    const est = $('filtroEstadoStock').value;
 
     const filtradas = piezas.filter(p => {
-        if (p.activo === false) return false;
-        const texto = [p.nombre, p.codigoPieza, p.material, p.ubicacion, p.numeroPlano, p.aplicacion].join(' ').toLowerCase();
-        const mNom = !fNom || texto.includes(fNom);
-        const mMat = !fMat || p.material === fMat;
-        const mCal = !fCal || p.calibre === fCal;
-        const mCat = !fCat || p.categoria === fCat;
-        const stock = Number(p.stockActual || 0);
-        const minimo = Number(p.stockMin || 0);
-        let mEst = true;
-        if (fEst === 'BAJO') mEst = stock > 0 && stock <= minimo;
-        if (fEst === 'CERO') mEst = stock === 0;
-        if (fEst === 'OK') mEst = stock > minimo;
-        return mNom && mMat && mCal && mCat && mEst;
+        let matchTexto = p.nombre.toLowerCase().includes(texto) || (p.codigoPieza && p.codigoPieza.toLowerCase().includes(texto));
+        let matchMat = mat === "" || p.material === mat;
+        let matchCat = cat === "" || p.categoria === cat;
+        
+        let matchEst = true;
+        if (est === "CERO") matchEst = Number(p.stockActual) === 0;
+        else if (est === "BAJO") matchEst = Number(p.stockActual) > 0 && Number(p.stockActual) <= Number(p.stockMin);
+        else if (est === "OK") matchEst = Number(p.stockActual) > Number(p.stockMin);
+
+        return matchTexto && matchMat && matchCat && matchEst;
     });
 
-    renderTablaPiezas(filtradas);
-}
-
-function estadoBadge(p) {
-    const stock = Number(p.stockActual || 0);
-    const minimo = Number(p.stockMin || 0);
-    if (stock === 0) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">Agotado</span>`;
-    if (stock <= minimo) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Bajo mínimo</span>`;
-    return `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">OK</span>`;
-}
-
-function renderTablaPiezas(lista) {
-    $('textoResultados').textContent = `${lista.length} piezas encontradas`;
+    $('textoResultados').textContent = `${filtradas.length} resultados`;
     const tbody = $('tablaPiezasBody');
-    if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
+    tbody.innerHTML = '';
+
+    if(filtradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-slate-500">No se encontraron piezas</td></tr>';
         return;
     }
 
-    tbody.innerHTML = lista.map((p, idx) => `
-        <tr class="hover:bg-slate-50">
-            <td class="p-2.5 font-mono">${idx + 1}</td>
-            <td class="p-2.5 font-bold font-mono text-orange-700">${escapeHtml(p.codigoPieza || '')}</td>
-            <td class="p-2.5 font-bold">${escapeHtml(p.nombre || '')}</td>
-            <td class="p-2.5">${escapeHtml(p.material || '')}</td>
-            <td class="p-2.5">${escapeHtml(p.calibre || '')}</td>
-            <td class="p-2.5">${escapeHtml(p.ubicacion || 'Sin asignar')}</td>
-            <td class="p-2.5 text-center font-bold">${Number(p.stockActual || 0)} / ${Number(p.stockMin || 0)}</td>
-            <td class="p-2.5">${estadoBadge(p)}</td>
-            <td class="p-2.5"><div class="flex gap-1">
-                <button title="Detalle" onclick="verDetalle('${p.id}')" class="bg-slate-100 hover:bg-slate-200 p-1.5 rounded">👁️</button>
-                <button title="Editar" onclick="editarPieza('${p.id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-1.5 rounded">✏️</button>
-                <button title="Movimiento" onclick="abrirMovimiento('${p.id}')" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 p-1.5 rounded">🔄</button>
-                <button title="Desactivar" onclick="eliminarPieza('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 p-1.5 rounded">🗑️</button>
-            </div></td>
-        </tr>`).join('');
-}
+    filtradas.forEach(p => {
+        let estadoStr = `<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-[10px] font-bold">OK</span>`;
+        if (Number(p.stockActual) === 0) estadoStr = `<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-[10px] font-bold">SIN STOCK</span>`;
+        else if (Number(p.stockActual) <= Number(p.stockMin)) estadoStr = `<span class="bg-amber-100 text-amber-800 px-2 py-1 rounded text-[10px] font-bold">BAJO</span>`;
 
-function actualizarSelectFiltros() {
-    const matSet = [...new Set(piezas.map(p => p.material).filter(Boolean))].sort();
-    const calSet = [...new Set(piezas.map(p => p.calibre).filter(Boolean))].sort();
-    $('filtroMaterial').innerHTML = `<option value="">Todos los materiales</option>` + matSet.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
-    $('filtroCalibre').innerHTML = `<option value="">Todos los calibres</option>` + calSet.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2.5 font-mono font-bold text-orange-700">${p.codigoPieza}</td>
+                <td class="p-2.5 font-semibold">${p.nombre}</td>
+                <td class="p-2.5">${p.material}</td>
+                <td class="p-2.5">${p.ubicacion || '-'}</td>
+                <td class="p-2.5 text-center font-bold">${p.stockActual}</td>
+                <td class="p-2.5">${estadoStr}</td>
+                <td class="p-2.5 text-center">
+                    <button onclick="editarPieza('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold mr-1">Editar</button>
+                    <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded font-bold">Borrar</button>
+                </td>
+            </tr>
+        `;
+    });
 }
 
 function limpiarFiltros() {
-    $('filtroNombre').value = ''; $('filtroMaterial').value = ''; $('filtroCalibre').value = ''; $('filtroCategoria').value = ''; $('filtroEstadoStock').value = '';
+    $('filtroNombre').value = "";
+    $('filtroMaterial').value = "";
+    $('filtroCalibre').value = "";
+    $('filtroCategoria').value = "";
+    $('filtroEstadoStock').value = "";
     aplicarFiltros();
 }
 
 function actualizarSelectPiezas() {
-    const opciones = piezas.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${escapeHtml(p.codigoPieza || '')} - ${escapeHtml(p.nombre || '')}</option>`).join('');
-    $('solicitudPieza').innerHTML = `<option value="">Selecciona una pieza</option>${opciones}`;
-    $('movPieza').innerHTML = `<option value="">Selecciona una pieza</option>${opciones}`;
+    const selS = $('solicitudPieza');
+    const selM = $('movPieza');
+    const options = `<option value="">Seleccione una pieza...</option>` + 
+        piezas.map(p => `<option value="${p.id}">${p.codigoPieza} - ${p.nombre}</option>`).join('');
+    selS.innerHTML = options;
+    selM.innerHTML = options;
+
+    const mat = new Set(piezas.map(p=>p.material).filter(x=>x));
+    $('filtroMaterial').innerHTML = '<option value="">Todos los materiales</option>' + [...mat].map(m=>`<option value="${m}">${m}</option>`).join('');
 }
 
 // =========================================================
-// 5) SOLICITUDES
+// 4) SOLICITUDES (Edición y Borrado con contraseña)
 // =========================================================
 async function guardarSolicitud(e) {
     e.preventDefault();
-    const piezaId = $('solicitudPieza').value;
-    const p = piezas.find(x => x.id === piezaId);
-    if (!p) return mostrarError('Selecciona una pieza válida.');
-
-    const payload = {
-        piezaId,
+    const id = $('editSolicitudId').value;
+    const p = piezas.find(x => x.id === $('solicitudPieza').value);
+    
+    const data = {
+        piezaId: p.id,
         piezaCodigo: p.codigoPieza,
         piezaNombre: p.nombre,
         cantidad: Number($('solicitudCantidad').value),
         prioridad: $('solicitudPrioridad').value,
-        solicitante: $('solicitudSolicitante').value.trim(),
-        motivo: $('solicitudMotivo').value.trim(),
-        estado: 'Pendiente',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        usuarioId: auth.currentUser?.uid || null
+        solicitante: $('solicitudSolicitante').value,
+        estado: $('solicitudEstado').value,
+        motivo: $('solicitudMotivo').value
     };
 
     try {
-        await db.collection('solicitudes').add(payload);
-        $('formSolicitud').reset();
-        alert('Solicitud creada correctamente.');
-    } catch (err) {
-        mostrarError('Error al crear solicitud: ' + err.message);
+        if(id) {
+            await db.collection('solicitudes').doc(id).update(data);
+            alert("Solicitud actualizada.");
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('solicitudes').add(data);
+            alert("Solicitud registrada.");
+        }
+        cancelarEdicionSolicitud();
+    } catch(err) {
+        alert("Error: " + err.message);
     }
 }
 
-async function cambiarEstadoSolicitud(id, estado) {
-    try {
-        await db.collection('solicitudes').doc(id).update({ estado, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-    } catch (err) { mostrarError('No se pudo actualizar la solicitud: ' + err.message); }
+function editarSolicitud(id) {
+    const s = solicitudes.find(x => x.id === id);
+    if(!s) return;
+    
+    $('editSolicitudId').value = s.id;
+    $('solicitudPieza').value = s.piezaId;
+    $('solicitudCantidad').value = s.cantidad;
+    $('solicitudPrioridad').value = s.prioridad;
+    $('solicitudSolicitante').value = s.solicitante;
+    $('solicitudEstado').value = s.estado;
+    $('solicitudMotivo').value = s.motivo || "";
+
+    $('tituloSolicitud').textContent = "Editar Solicitud";
+    $('estadoEdicionSolicitud').classList.remove('hidden');
+    $('btnCancelarEdicionSolicitud').classList.remove('hidden');$('btnGuardarSolicitud').textContent = "📝 Actualizar solicitud";
+}
+
+function cancelarEdicionSolicitud() {
+    $('formSolicitud').reset();$('editSolicitudId').value = "";
+    $('tituloSolicitud').textContent = "Solicitar más piezas";
+    $('estadoEdicionSolicitud').classList.add('hidden');
+    $('btnCancelarEdicionSolicitud').classList.add('hidden');$('btnGuardarSolicitud').textContent = "📝 Guardar solicitud";
+}
+
+function eliminarSolicitud(id) {
+    const pwd = prompt("ACCESO RESTRINGIDO\nIngrese la contraseña para eliminar la solicitud:");
+    if (pwd === ADMIN_PASSWORD) {
+        if(confirm("¿Seguro que desea borrar esta solicitud?")) {
+            db.collection('solicitudes').doc(id).delete()
+              .then(() => alert("Solicitud eliminada."))
+              .catch(err => alert("Error: " + err.message));
+        }
+    } else if (pwd !== null) {
+        alert("Contraseña incorrecta.");
+    }
 }
 
 function renderSolicitudes() {
-    const fil = $('filtroSolicitudEstado').value;
-    const lista = fil ? solicitudes.filter(s => s.estado === fil) : solicitudes;
+    const filtro = $('filtroSolicitudEstado').value;
     const tbody = $('tablaSolicitudesBody');
-    if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400">Sin solicitudes.</td></tr>`;
+    tbody.innerHTML = '';
+    
+    const solFiltradas = filtro ? solicitudes.filter(s => s.estado === filtro) : solicitudes;
+    
+    if(solFiltradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-slate-500">No hay solicitudes</td></tr>';
         return;
     }
 
-    tbody.innerHTML = lista.map(s => `
-        <tr class="hover:bg-slate-50">
-            <td class="p-2.5 text-[11px]">${fechaTexto(s.createdAt)}</td>
-            <td class="p-2.5"><div class="font-bold font-mono text-orange-700">${escapeHtml(s.piezaCodigo || '')}</div><div class="text-[11px] text-slate-500">${escapeHtml(s.piezaNombre || '')}</div></td>
-            <td class="p-2.5 text-center font-bold">${Number(s.cantidad || 0)}</td>
-            <td class="p-2.5">${escapeHtml(s.prioridad || '')}</td>
-            <td class="p-2.5">${escapeHtml(s.solicitante || '')}</td>
-            <td class="p-2.5"><select onchange="cambiarEstadoSolicitud('${s.id}', this.value)" class="border rounded-lg px-2 py-1 text-xs"><option ${s.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option><option ${s.estado === 'En proceso' ? 'selected' : ''}>En proceso</option><option ${s.estado === 'Completada' ? 'selected' : ''}>Completada</option><option ${s.estado === 'Cancelada' ? 'selected' : ''}>Cancelada</option></select></td>
-        </tr>`).join('');
+    solFiltradas.forEach(s => {
+        const fecha = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate().toLocaleDateString() : 'Reciente';
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2.5">${fecha}</td>
+                <td class="p-2.5 font-bold">${s.piezaCodigo} <span class="text-slate-500 font-normal">(${s.piezaNombre})</span></td>
+                <td class="p-2.5">${s.cantidad}</td>
+                <td class="p-2.5">${s.prioridad}</td>
+                <td class="p-2.5">${s.solicitante}</td>
+                <td class="p-2.5 font-bold text-orange-600">${s.estado}</td>
+                <td class="p-2.5">
+                    <button onclick="editarSolicitud('${s.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold mr-1">Editar</button>
+                    <button onclick="eliminarSolicitud('${s.id}')" class="bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded font-bold">Borrar</button>
+                </td>
+            </tr>
+        `;
+    });
 }
 
 // =========================================================
-// 6) MOVIMIENTOS DE STOCK
+// 5) MOVIMIENTOS Y ESCÁNER QR CORREGIDO
 // =========================================================
-function abrirMovimiento(piezaId = '') {
-    $('movPieza').value = piezaId || '';
-    $('movTipo').value = 'ENTRADA';
-    $('movCantidad').value = 1;
-    $('movResponsable').value = '';
-    $('movMotivo').value = '';
-    $('modalMovimiento').classList.remove('hidden');
-}
-
+function abrirMovimiento() { $('modalMovimiento').classList.remove('hidden'); }
 function cerrarMovimiento() { $('modalMovimiento').classList.add('hidden'); }
 
 async function guardarMovimiento(e) {
     e.preventDefault();
-    const piezaId = $('movPieza').value;
+    const pId = $('movPieza').value;
     const tipo = $('movTipo').value;
     const cantidad = Number($('movCantidad').value);
-    const responsable = $('movResponsable').value.trim();
-    const motivo = $('movMotivo').value.trim();
-    if (!piezaId || cantidad < 1 || !responsable) return mostrarError('Completa los datos del movimiento.');
+    
+    const p = piezas.find(x => x.id === pId);
+    let nuevoStock = Number(p.stockActual);
+    
+    if (tipo === "ENTRADA") nuevoStock += cantidad;
+    else if (tipo === "SALIDA") nuevoStock -= cantidad;
+    else if (tipo === "AJUSTE") nuevoStock = cantidad;
 
-    const piezaRef = db.collection('piezas').doc(piezaId);
+    if (nuevoStock < 0) return alert("El stock no puede ser negativo.");
+
     try {
-        await db.runTransaction(async transaction => {
-            const snap = await transaction.get(piezaRef);
-            if (!snap.exists) throw new Error('La pieza ya no existe.');
-            const p = snap.data();
-            const anterior = Number(p.stockActual || 0);
-            let nuevo = anterior;
-            if (tipo === 'ENTRADA') nuevo = anterior + cantidad;
-            if (tipo === 'SALIDA') {
-                nuevo = anterior - cantidad;
-                if (nuevo < 0) throw new Error('No hay suficiente stock para realizar esta salida.');
-            }
-            if (tipo === 'AJUSTE') nuevo = cantidad;
-
-            transaction.update(piezaRef, { stockActual: nuevo, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp(), actualizadoPor: auth.currentUser?.uid || null });
-            const movRef = db.collection('movimientos').doc();
-            transaction.set(movRef, {
-                piezaId,
-                piezaCodigo: p.codigoPieza,
-                piezaNombre: p.nombre,
-                tipo,
-                cantidad,
-                stockAnterior: anterior,
-                stockResultante: nuevo,
-                responsable,
-                motivo,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                usuarioId: auth.currentUser?.uid || null
-            });
+        await db.collection('piezas').doc(pId).update({ stockActual: nuevoStock });
+        await db.collection('movimientos').add({
+            piezaId: p.id,
+            piezaCodigo: p.codigoPieza,
+            piezaNombre: p.nombre,
+            tipo: tipo,
+            cantidad: cantidad,
+            stockResultante: nuevoStock,
+            responsable: $('movResponsable').value,
+            motivo: $('movMotivo').value,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-
-        cerrarMovimiento();
-        alert('Movimiento registrado correctamente.');
-    } catch (err) {
-        mostrarError('Error al registrar movimiento: ' + err.message);
+        alert("Movimiento guardado.");
+        $('modalMovimiento').classList.add('hidden');
+        e.target.reset();
+    } catch(err) {
+        alert("Error: " + err.message);
     }
 }
 
 function renderMovimientos() {
     const tbody = $('tablaMovimientosBody');
-    if (!movimientos.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400">Sin movimientos registrados.</td></tr>`;
+    tbody.innerHTML = '';
+    if(movimientos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-slate-500">No hay movimientos</td></tr>';
         return;
     }
-    tbody.innerHTML = movimientos.map(m => {
-        const clase = m.tipo?.includes('SALIDA') ? 'text-red-700' : (m.tipo?.includes('ENTRADA') ? 'text-emerald-700' : 'text-orange-700');
-        return `<tr class="hover:bg-slate-50">
-            <td class="p-2.5 text-[11px]">${fechaTexto(m.createdAt, true)}</td>
-            <td class="p-2.5"><span class="font-mono font-bold text-orange-700">${escapeHtml(m.piezaCodigo || '')}</span><div class="text-[11px] text-slate-500">${escapeHtml(m.piezaNombre || '')}</div></td>
-            <td class="p-2.5 font-bold ${clase}">${escapeHtml(m.tipo || '')}</td>
-            <td class="p-2.5 font-bold">${Number(m.cantidad || 0)}</td>
-            <td class="p-2.5 font-bold">${Number(m.stockResultante || 0)}</td>
-            <td class="p-2.5">${escapeHtml(m.responsable || '')}</td>
-            <td class="p-2.5">${escapeHtml(m.motivo || '')}</td>
-        </tr>`;
-    }).join('');
+    movimientos.forEach(m => {
+        const fecha = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleString() : 'Reciente';
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2.5">${fecha}</td>
+                <td class="p-2.5 font-bold">${m.piezaCodigo}</td>
+                <td class="p-2.5 font-bold ${m.tipo==='ENTRADA'?'text-green-600':m.tipo==='SALIDA'?'text-red-600':'text-blue-600'}">${m.tipo}</td>
+                <td class="p-2.5">${m.cantidad}</td>
+                <td class="p-2.5">${m.stockResultante}</td>
+                <td class="p-2.5">${m.responsable}</td>
+                <td class="p-2.5">${m.motivo}</td>
+            </tr>
+        `;
+    });
 }
 
-// =========================================================
-// 7) DETALLE + QR
-// =========================================================
-function verDetalle(id) {
-    const p = piezas.find(x => x.id === id);
-    if (!p) return;
-
-    $('detalleTitulo').textContent = p.nombre || 'Detalle de pieza';
-    $('detalleCodigo').textContent = p.codigoPieza || '';
-    $('dNombre').textContent = p.nombre || '—';
-    $('dMaterial').textContent = p.material || '—';
-    $('dCalibre').textContent = p.calibre || '—';
-    $('dAplicacion').textContent = p.aplicacion || '—';
-    $('dUbicacion').textContent = p.ubicacion || 'Sin asignar';
-    $('dProveedor').textContent = p.proveedor || '—';
-    $('dPlano').textContent = p.numeroPlano || '—';
-    $('dStock').textContent = `${Number(p.stockActual || 0)} ${p.unidad || 'pieza'}(s) | mínimo: ${Number(p.stockMin || 0)} | máximo: ${Number(p.stockMax || 0)}`;
-    $('dDescripcion').textContent = p.descripcion || '—';
-
-    $('qrDetalle').innerHTML = '';
-    new QRCode($('qrDetalle'), { text: p.codigoPieza || '', width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
-
-    $('btnDetalleEditar').onclick = () => { cerrarDetalle(); editarPieza(p.id); };
-    $('modalDetalle').classList.remove('hidden');
-}
-
-function cerrarDetalle() { $('modalDetalle').classList.add('hidden'); }
-
-// =========================================================
-// 8) ESCÁNER QR
-// =========================================================
+// ESCANER CORREGIDO
 function abrirEscaner() {
     $('modalEscaner').classList.remove('hidden');
-    try {
-        escaner = new Html5Qrcode("reader");
-        escaner.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 }, texto => {
-            detenerCamara();
-            cerrarEscaner();
-            const p = piezas.find(x => x.codigoPieza === texto.trim());
-            if (p) verDetalle(p.id); else alert("Pieza no encontrada: " + texto);
-        }).catch(err => console.error('Error de cámara:', err));
-    } catch (err) { console.error(err); }
-}
-
-function detenerCamara() {
-    if (escaner) {
-        escaner.stop().catch(() => {});
-        escaner.clear().catch(() => {});
-        escaner = null;
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
     }
-}
-function cerrarEscaner() { detenerCamara(); $('modalEscaner').classList.add('hidden'); }
-
-// =========================================================
-// 9) PDF
-// =========================================================
-function descargarInventarioPDF() {
-    if (!piezas.length) return alert('No hay piezas para generar el reporte.');
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(16); doc.text("Reporte de Inventario Estandarizado - VOLMEX", 14, 15);
-    doc.setFontSize(9); doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 21);
-    const data = piezas.filter(p => p.activo !== false).map((p, i) => [i + 1, p.codigoPieza, p.nombre, p.material, p.calibre, p.ubicacion || '', p.stockActual ?? 0, p.stockMin ?? 0, p.stockMax ?? 0]);
-    doc.autoTable({ head: [['#','Código','Nombre','Material','Calibre','Ubicación','Actual','Mín.','Máx.']], body: data, startY: 26, styles: { fontSize: 7 } });
-    doc.save("inventario_estandarizado_volmex.pdf");
-}
-
-// =========================================================
-// 10) UTILIDADES
-// =========================================================
-function fechaTexto(timestamp, incluirHora = false) {
-    if (!timestamp) return '—';
-    const fecha = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return fecha.toLocaleString('es-MX', incluirHora ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });
+    html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+            $('filtroNombre').value = decodedText;
+            aplicarFiltros();
+            cerrarEscaner(); // Cierra y detiene la cámara al leer con éxito
+            mostrarSeccion('inventario');
+        },
+        (errorMessage) => { /* Ignorar errores de lectura cuadro por cuadro */ }
+    ).catch(err => {
+        console.error("Error iniciando cámara", err);
+        alert("Error al acceder a la cámara. Asegúrate de dar permisos.");
+    });
 }
 
-function escapeHtml(valor) {
-    return String(valor ?? '')
-        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+function cerrarEscaner() {
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+            $('modalEscaner').classList.add('hidden');
+        }).catch(err => {
+            console.error("Error deteniendo cámara", err);
+            $('modalEscaner').classList.add('hidden'); // Ocultar de todos modos
+        });
+    } else {
+        $('modalEscaner').classList.add('hidden');
+    }
 }
 </script>
 </body>
