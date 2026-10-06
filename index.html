@@ -11,7 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-storage-compat.js"></script>
 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -74,7 +73,7 @@
                 <div class="flex items-center justify-between border-b pb-3 mb-4">
                     <div>
                         <h2 id="tituloFormulario" class="font-bold text-lg">Registrar nueva pieza</h2>
-                        <p class="text-xs text-slate-500">Los datos se guardan en Firestore y los archivos en Firebase Storage.</p>
+                        <p class="text-xs text-slate-500">Los datos de las piezas se guardan en Firebase Firestore.</p>
                     </div>
                     <span id="estadoEdicion" class="hidden text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">EDITANDO</span>
                 </div>
@@ -175,14 +174,7 @@
                         <textarea id="descripcion" rows="3" class="w-full border rounded-lg p-2.5" placeholder="Características, medidas, observaciones o criterios de estandarización..."></textarea>
                     </div>
 
-                    <div>
-                        <label class="block font-semibold mb-1">Archivo asociado</label>
-                        <input type="file" id="archivoPieza" accept=".pdf,.dwg,.dxf,.step,.stp,.iges,.igs,.sldprt,.jpg,.jpeg,.png,.webp" class="w-full border rounded-lg p-2 text-xs bg-slate-50">
-                        <div id="archivoActual" class="text-[11px] text-slate-500 mt-1"></div>
-                    </div>
-
                     <input type="hidden" id="editDocId" value="">
-                    <input type="hidden" id="editArchivoPath" value="">
 
                     <div class="flex gap-2 pt-2">
                         <button type="submit" id="btnGuardar" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow">💾 Guardar pieza</button>
@@ -222,13 +214,13 @@
                 </div>
 
                 <div class="overflow-x-auto border rounded-lg">
-                    <table class="w-full text-xs text-left min-w-[1100px]">
+                    <table class="w-full text-xs text-left min-w-[980px]">
                         <thead>
                             <tr class="bg-slate-100 text-slate-700 border-b">
-                                <th class="p-2.5">No.</th><th class="p-2.5">Código</th><th class="p-2.5">Nombre</th><th class="p-2.5">Material</th><th class="p-2.5">Calibre</th><th class="p-2.5">Ubicación</th><th class="p-2.5 text-center">Stock</th><th class="p-2.5">Archivo</th><th class="p-2.5">Estado</th><th class="p-2.5">Acciones</th>
+                                <th class="p-2.5">No.</th><th class="p-2.5">Código</th><th class="p-2.5">Nombre</th><th class="p-2.5">Material</th><th class="p-2.5">Calibre</th><th class="p-2.5">Ubicación</th><th class="p-2.5 text-center">Stock</th><th class="p-2.5">Estado</th><th class="p-2.5">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaPiezasBody" class="divide-y"><tr><td colspan="10" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
+                        <tbody id="tablaPiezasBody" class="divide-y"><tr><td colspan="9" class="p-5 text-center text-slate-400">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -330,11 +322,9 @@
                 <div class="bg-slate-50 p-2 rounded"><b>No. plano:</b> <span id="dPlano"></span></div>
                 <div class="bg-slate-50 p-2 rounded"><b>Stock:</b> <span id="dStock"></span></div>
                 <div class="bg-slate-50 p-2 rounded"><b>Descripción:</b> <span id="dDescripcion"></span></div>
-                <div class="bg-slate-50 p-2 rounded"><b>Archivo:</b> <span id="dArchivoNombre"></span></div>
             </div>
             <div class="border rounded-xl p-3 text-center flex flex-col items-center justify-center">
                 <div class="text-xs font-bold text-slate-500 mb-2">CÓDIGO QR</div><div id="qrDetalle"></div>
-                <button id="btnVerArchivoDetalle" class="hidden mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold">📎 Ver archivo asociado</button>
             </div>
         </div>
         <div class="flex gap-2 border-t pt-3"><button id="btnDetalleEditar" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">✏️ Editar</button><button onclick="cerrarDetalle()" class="bg-slate-200 rounded-lg px-4 py-2 text-xs font-semibold ml-auto">Cerrar</button></div>
@@ -345,9 +335,12 @@
 // =========================================================
 // 1) CONFIGURACIÓN FIREBASE
 // =========================================================
+// Configuración obtenida desde Firebase Console > Configuración del proyecto > Tus apps > Aplicación web.
+// Esta versión usa Firestore; NO usa Firebase Storage.
 const firebaseConfig = {
-    apiKey: "AIzaSyCtkeAfKKGn-n-zJZxaeMx1VGNy53ny5wM",
+    apiKey: "AIzaSyCtkeAfKKGn-n-zJZXaeMx1VGNy53ny5wM",
     authDomain: "stock-3ce41.firebaseapp.com",
+    databaseURL: "https://stock-3ce41-default-rtdb.firebaseio.com",
     projectId: "stock-3ce41",
     storageBucket: "stock-3ce41.firebasestorage.app",
     messagingSenderId: "807024859476",
@@ -356,7 +349,6 @@ const firebaseConfig = {
 
 let app;
 let db;
-let storage;
 let auth;
 let piezas = [];
 let solicitudes = [];
@@ -373,7 +365,8 @@ function mostrarError(mensaje) {
 }
 
 function firebaseConfigCompleta() {
-    return Object.values(firebaseConfig).every(v => v && !String(v).includes("PEGA_AQUI"));
+    const requeridos = [firebaseConfig.apiKey, firebaseConfig.authDomain, firebaseConfig.projectId, firebaseConfig.messagingSenderId, firebaseConfig.appId];
+    return requeridos.every(v => v && !String(v).includes("PEGA_AQUI"));
 }
 
 async function inicializarFirebase() {
@@ -389,10 +382,9 @@ async function inicializarFirebase() {
         }
 
         db = firebase.firestore();
-        storage = firebase.storage();
         auth = firebase.auth();
 
-        // Inicio de sesión anónimo para no dejar Firestore/Storage completamente abiertos.
+        // Inicio de sesión anónimo para proteger el acceso a Firestore.
         await auth.signInAnonymously();
 
         $('estadoConexion').textContent = "Firebase conectado";
@@ -405,7 +397,7 @@ async function inicializarFirebase() {
         console.error(err);
         $('estadoConexion').textContent = "Error de Firebase";
         $('estadoConexion').className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full";
-        mostrarError("No se pudo conectar con Firebase. Revisa firebaseConfig, Firestore, Storage y el acceso anónimo.\n\n" + (err.message || err));
+        mostrarError("No se pudo conectar con Firebase. Revisa firebaseConfig, Firestore y que el acceso anónimo esté habilitado en Authentication.\n\n" + (err.message || err));
     }
 }
 
@@ -497,7 +489,7 @@ async function obtenerSiguienteCodigo(categoria, proceso) {
 // =========================================================
 async function guardarPieza(e) {
     e.preventDefault();
-    if (!db || !storage) return mostrarError("Firebase todavía no está listo.");
+    if (!db) return mostrarError("Firebase todavía no está listo.");
 
     const id = $('editDocId').value.trim();
     const boton = $('btnGuardar');
@@ -513,35 +505,12 @@ async function guardarPieza(e) {
 
         let piezaId = id;
         let codigo = $('codigoGeneradoVista').textContent;
-        let archivoUrl = '';
-        let archivoNombre = '';
-        let archivoPath = $('editArchivoPath').value || '';
-        let archivoTipo = '';
-
         if (!piezaId) {
             piezaId = db.collection('piezas').doc().id;
             codigo = await obtenerSiguienteCodigo($('categoria').value, $('proceso').value);
         }
 
         const piezaExistente = id ? piezas.find(p => p.id === id) : null;
-        archivoUrl = piezaExistente?.archivoUrl || '';
-        archivoNombre = piezaExistente?.archivoNombre || '';
-        archivoTipo = piezaExistente?.archivoTipo || '';
-
-        const archivo = $('archivoPieza').files[0];
-        if (archivo) {
-            // Límite práctico para la aplicación web. Para archivos CAD grandes conviene configurar Storage con el límite que necesites.
-            const maxBytes = 50 * 1024 * 1024;
-            if (archivo.size > maxBytes) throw new Error("El archivo supera el límite de 50 MB.");
-
-            const nombreSeguro = archivo.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            archivoPath = `piezas/${piezaId}/${Date.now()}_${nombreSeguro}`;
-            const ref = storage.ref(archivoPath);
-            const upload = await ref.put(archivo, { contentType: archivo.type || 'application/octet-stream' });
-            archivoUrl = await upload.ref.getDownloadURL();
-            archivoNombre = archivo.name;
-            archivoTipo = archivo.type || 'application/octet-stream';
-        }
 
         const ahora = firebase.firestore.FieldValue.serverTimestamp();
         const payload = {
@@ -560,10 +529,6 @@ async function guardarPieza(e) {
             stockMin,
             stockMax,
             descripcion: $('descripcion').value.trim(),
-            archivoUrl,
-            archivoNombre,
-            archivoTipo,
-            archivoPath,
             fechaActualizacion: ahora,
             actualizadoPor: auth.currentUser?.uid || null,
             activo: true
@@ -610,11 +575,6 @@ async function guardarPieza(e) {
             }
         }
 
-        // Si se reemplazó el archivo, elimina el anterior para no acumular basura en Storage.
-        if (archivo && piezaExistente?.archivoPath && piezaExistente.archivoPath !== archivoPath) {
-            try { await storage.ref(piezaExistente.archivoPath).delete(); } catch (deleteErr) { console.warn('No se eliminó el archivo anterior:', deleteErr); }
-        }
-
         cancelarEdicion();
         alert(id ? "Pieza actualizada correctamente." : "Pieza registrada correctamente.");
     } catch (err) {
@@ -646,9 +606,6 @@ function editarPieza(id) {
     $('stockMin').value = p.stockMin ?? 1;
     $('stockMax').value = p.stockMax ?? 5;
     $('descripcion').value = p.descripcion || '';
-    $('editArchivoPath').value = p.archivoPath || '';
-    $('archivoPieza').value = '';
-    $('archivoActual').innerHTML = p.archivoUrl ? `Archivo actual: <a class="text-blue-600 hover:underline" href="${p.archivoUrl}" target="_blank" rel="noopener">${escapeHtml(p.archivoNombre || 'Ver archivo')}</a>` : 'Sin archivo asociado.';
 
     $('tituloFormulario').textContent = "Editar pieza";
     $('estadoEdicion').classList.remove('hidden');
@@ -659,8 +616,6 @@ function editarPieza(id) {
 function cancelarEdicion() {
     $('formPieza').reset();
     $('editDocId').value = '';
-    $('editArchivoPath').value = '';
-    $('archivoActual').textContent = '';
     $('stockActual').value = 0;
     $('stockMin').value = 1;
     $('stockMax').value = 5;
@@ -678,9 +633,6 @@ async function eliminarPieza(id) {
     try {
         await db.collection('piezas').doc(id).update({ activo: false, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp() });
         // La mantenemos como registro histórico: no se borra físicamente.
-        if (p.archivoPath) {
-            try { await storage.ref(p.archivoPath).delete(); } catch (err) { console.warn('No se eliminó archivo:', err); }
-        }
         alert('Pieza marcada como inactiva. Se conserva el registro para trazabilidad.');
     } catch (err) {
         mostrarError('Error al desactivar la pieza: ' + err.message);
@@ -728,7 +680,7 @@ function renderTablaPiezas(lista) {
     $('textoResultados').textContent = `${lista.length} piezas encontradas`;
     const tbody = $('tablaPiezasBody');
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="p-5 text-center text-slate-400">Sin registros.</td></tr>`;
         return;
     }
 
@@ -741,7 +693,6 @@ function renderTablaPiezas(lista) {
             <td class="p-2.5">${escapeHtml(p.calibre || '')}</td>
             <td class="p-2.5">${escapeHtml(p.ubicacion || 'Sin asignar')}</td>
             <td class="p-2.5 text-center font-bold">${Number(p.stockActual || 0)} / ${Number(p.stockMin || 0)}</td>
-            <td class="p-2.5">${p.archivoUrl ? `<button onclick="verArchivo('${p.id}')" class="text-blue-600 hover:underline font-semibold">📎 Ver</button>` : '<span class="text-slate-400">—</span>'}</td>
             <td class="p-2.5">${estadoBadge(p)}</td>
             <td class="p-2.5"><div class="flex gap-1">
                 <button title="Detalle" onclick="verDetalle('${p.id}')" class="bg-slate-100 hover:bg-slate-200 p-1.5 rounded">👁️</button>
@@ -771,15 +722,7 @@ function actualizarSelectPiezas() {
 }
 
 // =========================================================
-// 5) ARCHIVOS
-// =========================================================
-function verArchivo(id) {
-    const p = piezas.find(x => x.id === id);
-    if (p?.archivoUrl) window.open(p.archivoUrl, '_blank', 'noopener');
-}
-
-// =========================================================
-// 6) SOLICITUDES
+// 5) SOLICITUDES
 // =========================================================
 async function guardarSolicitud(e) {
     e.preventDefault();
@@ -837,7 +780,7 @@ function renderSolicitudes() {
 }
 
 // =========================================================
-// 7) MOVIMIENTOS DE STOCK
+// 6) MOVIMIENTOS DE STOCK
 // =========================================================
 function abrirMovimiento(piezaId = '') {
     $('movPieza').value = piezaId || '';
@@ -919,7 +862,7 @@ function renderMovimientos() {
 }
 
 // =========================================================
-// 8) DETALLE + QR
+// 7) DETALLE + QR
 // =========================================================
 function verDetalle(id) {
     const p = piezas.find(x => x.id === id);
@@ -936,19 +879,9 @@ function verDetalle(id) {
     $('dPlano').textContent = p.numeroPlano || '—';
     $('dStock').textContent = `${Number(p.stockActual || 0)} ${p.unidad || 'pieza'}(s) | mínimo: ${Number(p.stockMin || 0)} | máximo: ${Number(p.stockMax || 0)}`;
     $('dDescripcion').textContent = p.descripcion || '—';
-    $('dArchivoNombre').textContent = p.archivoNombre || 'Sin archivo';
 
     $('qrDetalle').innerHTML = '';
     new QRCode($('qrDetalle'), { text: p.codigoPieza || '', width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
-
-    const btnArchivo = $('btnVerArchivoDetalle');
-    if (p.archivoUrl) {
-        btnArchivo.classList.remove('hidden');
-        btnArchivo.onclick = () => verArchivo(p.id);
-    } else {
-        btnArchivo.classList.add('hidden');
-        btnArchivo.onclick = null;
-    }
 
     $('btnDetalleEditar').onclick = () => { cerrarDetalle(); editarPieza(p.id); };
     $('modalDetalle').classList.remove('hidden');
@@ -957,7 +890,7 @@ function verDetalle(id) {
 function cerrarDetalle() { $('modalDetalle').classList.add('hidden'); }
 
 // =========================================================
-// 9) ESCÁNER QR
+// 8) ESCÁNER QR
 // =========================================================
 function abrirEscaner() {
     $('modalEscaner').classList.remove('hidden');
@@ -982,7 +915,7 @@ function detenerCamara() {
 function cerrarEscaner() { detenerCamara(); $('modalEscaner').classList.add('hidden'); }
 
 // =========================================================
-// 10) PDF
+// 9) PDF
 // =========================================================
 function descargarInventarioPDF() {
     if (!piezas.length) return alert('No hay piezas para generar el reporte.');
@@ -990,13 +923,13 @@ function descargarInventarioPDF() {
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16); doc.text("Reporte de Inventario Estandarizado - VOLMEX", 14, 15);
     doc.setFontSize(9); doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 21);
-    const data = piezas.filter(p => p.activo !== false).map((p, i) => [i + 1, p.codigoPieza, p.nombre, p.material, p.calibre, p.ubicacion || '', p.stockActual ?? 0, p.stockMin ?? 0, p.stockMax ?? 0, p.archivoUrl ? 'Sí' : 'No']);
-    doc.autoTable({ head: [['#','Código','Nombre','Material','Calibre','Ubicación','Actual','Mín.','Máx.','Archivo']], body: data, startY: 26, styles: { fontSize: 7 } });
+    const data = piezas.filter(p => p.activo !== false).map((p, i) => [i + 1, p.codigoPieza, p.nombre, p.material, p.calibre, p.ubicacion || '', p.stockActual ?? 0, p.stockMin ?? 0, p.stockMax ?? 0]);
+    doc.autoTable({ head: [['#','Código','Nombre','Material','Calibre','Ubicación','Actual','Mín.','Máx.']], body: data, startY: 26, styles: { fontSize: 7 } });
     doc.save("inventario_estandarizado_volmex.pdf");
 }
 
 // =========================================================
-// 11) UTILIDADES
+// 10) UTILIDADES
 // =========================================================
 function fechaTexto(timestamp, incluirHora = false) {
     if (!timestamp) return '—';
