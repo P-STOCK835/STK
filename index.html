@@ -12,11 +12,10 @@
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
 
+    <!-- Librerías de QR, Código de Barras y Escáner -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body class="bg-slate-100 min-h-screen text-slate-800">
@@ -190,9 +189,6 @@
                         <h2 class="font-bold text-lg">Inventario estandarizado</h2>
                         <p class="text-xs text-slate-500">Busca por código, nombre, material, ubicación o aplicación.</p>
                     </div>
-                    <div class="flex gap-2">
-                        <!-- Se removió la función PDF para no sobrecargar el código de este ejemplo, pero puedes reañadirla si la usas -->
-                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
@@ -303,6 +299,42 @@
     </section>
 </main>
 
+<!-- MODAL ETIQUETA / CÓDIGO QR -->
+<div id="modalQR" class="hidden fixed inset-0 bg-black/75 z-50 p-4 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
+            <div class="flex items-center justify-between border-b pb-3 mb-4">
+                <h3 class="font-bold text-lg text-slate-800">Etiqueta de Pieza</h3>
+                <button onclick="cerrarModalQR()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">×</button>
+            </div>
+
+            <!-- Contenedor imprimible -->
+            <div id="etiquetaImprimir" class="bg-white p-4 border-2 border-slate-900 rounded-xl shadow-inner space-y-3">
+                <div class="text-xs font-black tracking-widest text-orange-600 uppercase border-b border-slate-200 pb-1">VOLMEX - CONTROL DE STOCK</div>
+                <div id="qrCodigoPieza" class="text-xl font-black font-mono text-slate-900">SVD-P-001</div>
+                <div id="qrTituloPieza" class="text-sm font-bold text-slate-800 line-clamp-2">MENSULA IZQUIERDA</div>
+                
+                <!-- QR renderizado aquí -->
+                <div class="flex justify-center items-center my-2 p-2 bg-white border rounded-lg">
+                    <div id="qrcodeContainer"></div>
+                </div>
+
+                <!-- Código de barras en canvas -->
+                <div class="flex justify-center my-1 overflow-hidden">
+                    <svg id="barcodeCanvas"></svg>
+                </div>
+
+                <div id="qrDetallePieza" class="text-[11px] text-slate-600 font-semibold border-t border-slate-200 pt-2">Material: A-36 | Ubicación: Rack A-01</div>
+            </div>
+
+            <div class="mt-5 flex gap-2">
+                <button onclick="imprimirEtiqueta()" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-lg text-sm shadow">🖨️ Imprimir</button>
+                <button onclick="cerrarModalQR()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-sm">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL MOVIMIENTO -->
 <div id="modalMovimiento" class="hidden fixed inset-0 bg-black/70 z-50 p-4 overflow-y-auto">
     <div class="min-h-full flex items-center justify-center">
@@ -349,7 +381,6 @@ const firebaseConfig = {
     measurementId: "G-DDWQSJQ5Q2"
 };
 
-// Contraseña maestra para eliminar (Puedes cambiarla aquí)
 const ADMIN_PASSWORD = "admin123";
 
 let app, db, auth;
@@ -418,7 +449,7 @@ function escucharMovimientos() {
 }
 
 // =========================================================
-// 3) INVENTARIO Y CÓDIGOS (Se agrega la 'S' al código)
+// 3) INVENTARIO Y CÓDIGOS
 // =========================================================
 function actualizarEstadisticas() {
     $('statPiezas').textContent = piezas.length;
@@ -429,7 +460,6 @@ function actualizarEstadisticas() {
 
 function actualizarCodigoVistaPrevia() {
     if ($('editDocId').value) return; 
-    // Agregamos la "S" al inicio del prefijo
     const prefijo = `S${$('categoria').value}${$('proceso').value}`;
     const numeros = piezas
         .filter(p => String(p.codigoPieza || '').startsWith(prefijo + '-P-'))
@@ -526,7 +556,7 @@ function editarPieza(id) {
     $('tituloFormulario').textContent = "Editar pieza: " + p.codigoPieza;
     $('estadoEdicion').classList.remove('hidden');
     $('btnCancelarEdicion').classList.remove('hidden');$('btnGuardar').textContent = "💾 Actualizar pieza";
-    window.scrollTo(0, 0); // Sube al formulario
+    window.scrollTo(0, 0);
 }
 
 function cancelarEdicion() {
@@ -548,6 +578,64 @@ function eliminarPieza(id) {
     } else if (pwd !== null) {
         alert("Contraseña incorrecta. No se eliminó la pieza.");
     }
+}
+
+// =========================================================
+// 4) VISUALIZADOR Y GENERADOR DE CÓDIGO QR / BARRAS
+// =========================================================
+function verQR(id) {
+    const p = piezas.find(x => x.id === id);
+    if (!p) return;
+
+    $('qrCodigoPieza').textContent = p.codigoPieza;
+    $('qrTituloPieza').textContent = p.nombre;
+    $('qrDetallePieza').textContent = `Material: ${p.material || 'N/A'} | Ubicación: ${p.ubicacion || 'Sin asignar'}`;
+
+    // Limpiar contenedor anterior de QR
+    const container = $('qrcodeContainer');
+    container.innerHTML = '';
+
+    // Generar nuevo código QR
+    new QRCode(container, {
+        text: p.codigoPieza,
+        width: 150,
+        height: 150,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    // Generar código de barras
+    try {
+        JsBarcode("#barcodeCanvas", p.codigoPieza, {
+            format: "CODE128",
+            width: 1.8,
+            height: 40,
+            displayValue: false
+        });
+    } catch(e) { console.error("Error generando barcode", e); }
+
+    $('modalQR').classList.remove('hidden');
+}
+
+function cerrarModalQR() {
+    $('modalQR').classList.add('hidden');
+}
+
+function imprimirEtiqueta() {
+    const contenido = $('etiquetaImprimir').outerHTML;
+    const ventana = window.open('', '_blank', 'height=600,width=600');
+    ventana.document.write('<html><head><title>Imprimir Etiqueta - VOLMEX</title>');
+    ventana.document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+    ventana.document.write('</head><body class="p-6 flex justify-center items-center bg-white">');
+    ventana.document.write(contenido);
+    ventana.document.write('</body></html>');
+    ventana.document.close();
+    ventana.focus();
+    setTimeout(() => {
+        ventana.print();
+        ventana.close();
+    }, 500);
 }
 
 function aplicarFiltros() {
@@ -591,8 +679,9 @@ function aplicarFiltros() {
                 <td class="p-2.5">${p.ubicacion || '-'}</td>
                 <td class="p-2.5 text-center font-bold">${p.stockActual}</td>
                 <td class="p-2.5">${estadoStr}</td>
-                <td class="p-2.5 text-center">
-                    <button onclick="editarPieza('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold mr-1">Editar</button>
+                <td class="p-2.5 text-center flex justify-center gap-1">
+                    <button onclick="verQR('${p.id}')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 py-1 rounded font-bold">🏷️ QR</button>
+                    <button onclick="editarPieza('${p.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold">Editar</button>
                     <button onclick="eliminarPieza('${p.id}')" class="bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded font-bold">Borrar</button>
                 </td>
             </tr>
@@ -622,7 +711,7 @@ function actualizarSelectPiezas() {
 }
 
 // =========================================================
-// 4) SOLICITUDES (Edición y Borrado con contraseña)
+// 5) SOLICITUDES
 // =========================================================
 async function guardarSolicitud(e) {
     e.preventDefault();
@@ -724,7 +813,7 @@ function renderSolicitudes() {
 }
 
 // =========================================================
-// 5) MOVIMIENTOS Y ESCÁNER QR CORREGIDO
+// 6) MOVIMIENTOS Y ESCÁNER QR
 // =========================================================
 function abrirMovimiento() { $('modalMovimiento').classList.remove('hidden'); }
 function cerrarMovimiento() { $('modalMovimiento').classList.add('hidden'); }
@@ -788,7 +877,6 @@ function renderMovimientos() {
     });
 }
 
-// ESCANER CORREGIDO
 function abrirEscaner() {
     $('modalEscaner').classList.remove('hidden');
     if (!html5QrCode) {
@@ -800,13 +888,13 @@ function abrirEscaner() {
         (decodedText) => {
             $('filtroNombre').value = decodedText;
             aplicarFiltros();
-            cerrarEscaner(); // Cierra y detiene la cámara al leer con éxito
+            cerrarEscaner();
             mostrarSeccion('inventario');
         },
-        (errorMessage) => { /* Ignorar errores de lectura cuadro por cuadro */ }
+        (errorMessage) => { }
     ).catch(err => {
         console.error("Error iniciando cámara", err);
-        alert("Error al acceder a la cámara. Asegúrate de dar permisos.");
+        alert("Error al acceder a la cámara.");
     });
 }
 
@@ -816,7 +904,7 @@ function cerrarEscaner() {
             $('modalEscaner').classList.add('hidden');
         }).catch(err => {
             console.error("Error deteniendo cámara", err);
-            $('modalEscaner').classList.add('hidden'); // Ocultar de todos modos
+            $('modalEscaner').classList.add('hidden');
         });
     } else {
         $('modalEscaner').classList.add('hidden');
